@@ -724,7 +724,7 @@
                                 <button onClick={() => setScore(s => ({ ...s, away: s.away + 1 }))} className={`w-8 h-8 rounded-full ${oppColor.bg} text-white flex items-center justify-center font-bold shadow active:scale-90 transition-transform`}><Icons.Plus size={16} /></button>
                             </div>
                         </div>
-                        <div className="mt-1 text-[10px] text-slate-400 font-semibold truncate max-w-[220px] text-center">JO9-10 <span className="text-slate-600 mx-1">vs</span> {safeOpponent.name}</div>
+                        <div className="mt-1 text-[10px] text-slate-400 font-semibold truncate max-w-[220px] text-center">vv Nieuwerkerk <span className="text-slate-600 mx-1">vs</span> {safeOpponent.name}</div>
                     </div>
                     <div className="w-20 flex justify-end">
                         <button onClick={() => setView(prev => (prev === 'setup' ? 'field' : 'setup'))} className="p-2 bg-slate-800 rounded-lg text-slate-300 border border-slate-700 hover:text-white"><Icons.Settings size={20} /></button>
@@ -830,3 +830,4 @@
 </script>
 </body>
 </html>
+
