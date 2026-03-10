@@ -4,24 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Coach App JO9-10</title>
-    <!-- Aangepast naar een zachte lichte kleur -->
     <meta name="theme-color" content="#f8fafc">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <!-- Default status bar zorgt voor donkere tekst op lichte achtergrond op iOS -->
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
 
     <style>
-        /* Rustige, lichte achtergrondkleur om flitsen te voorkomen */
+        /* Rustige achtergrondkleur, scroll-gedrag geoptimaliseerd voor mobile */
         html, body {
-            background-color: #f8fafc;
-            overscroll-behavior-y: none;
-            user-select: none;
-            -webkit-user-select: none;
+            background-color: #e2e8f0; /* Donkerdere buitenste achtergrond voor contrast op grote schermen */
             font-family: system-ui, -apple-system, sans-serif;
             -webkit-tap-highlight-color: transparent;
             margin: 0;
             padding: 0;
+            overscroll-behavior-y: none; /* Voorkomt het "bouncen" van de hele webpagina buiten de app */
         }
+        
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
         
@@ -42,17 +39,17 @@
         }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800 h-screen w-full overflow-hidden">
+<body class="text-slate-800 antialiased w-full">
     
 <!-- Prikkelarme laad-indicator -->
-<div id="root" class="h-full w-full flex items-center justify-center">
+<div id="root" class="min-h-[100dvh] w-full flex items-center justify-center bg-slate-50 max-w-md mx-auto shadow-2xl">
     <div class="text-slate-400 font-mono text-sm animate-pulse-slow flex flex-col items-center gap-3">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="animate-spin text-slate-300"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
         Overzicht laden...
     </div>
 </div>
 
-<!-- Vangnet aangepast naar het lichte thema -->
+<!-- Vangnet -->
 <script>
     window.addEventListener('error', function(event) {
         const root = document.getElementById('root');
@@ -81,7 +78,7 @@
     // --------------------------------------------------------------------
     // CONSTANTEN & CONFIG
     // --------------------------------------------------------------------
-    const APP_VERSION = '2.0.0 (Light Theme)';
+    const APP_VERSION = '2.1.0 (Layout Fixes)';
     const STORAGE_VERSION = 'v32_flex';
 
     const FORMATIONS = {
@@ -318,9 +315,9 @@
         const positions = FORMATIONS[formation].positions;
 
         return (
-            <div className="absolute inset-0 p-4 flex items-center justify-center">
+            <div className="absolute inset-0 p-4 flex items-center justify-center min-h-[450px]">
                 {/* Lichter, frisser veld */}
-                <div className="w-full h-full max-w-md max-h-[800px] relative bg-emerald-500 rounded-2xl border-4 border-white shadow-sm overflow-hidden select-none">
+                <div className="w-full h-full max-w-md relative bg-emerald-500 rounded-2xl border-4 border-white shadow-sm overflow-hidden select-none">
                     <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-emerald-300 via-transparent to-transparent"></div>
                     <div className="absolute inset-0" style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.1) 40px)' }}></div>
                     <div className="absolute top-1/2 left-0 w-full h-0.5 bg-white/40"></div>
@@ -794,8 +791,8 @@
         const benchPlayers = getBench(players);
 
         return (
-            // De wrapper is lichter gemaakt (bg-slate-50) en de veilige zone voor de Notch/Dynamic Island is toegevoegd aan de top (paddingTop)
-            <div className="flex flex-col h-full w-full max-w-md mx-auto relative bg-slate-50 shadow-2xl" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+            // Flex-container layout met expliciete 100dvh min-height voor perfecte iOS integratie, en overflow-y-auto toegestaan.
+            <div className="flex flex-col min-h-[100dvh] w-full max-w-md mx-auto relative bg-slate-50 shadow-2xl overflow-y-auto overflow-x-hidden" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
                 {showConfetti && <ConfettiExplosion />}
 
                 {/* MODALS (Light Mode) */}
@@ -850,36 +847,39 @@
                     </div>
                 )}
 
-                {/* TOPBAR (Licht Thema + Ruimte voor Notch is nu in de main div gefixt) */}
-                <div className="flex-none h-20 bg-white/95 backdrop-blur-md border-b border-slate-200 flex items-center justify-between px-4 z-50">
-                    <div className="flex flex-col w-20">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Kwart {quarter}</span>
-                        {/* bg-white toegevoegd in de rode status om de iOS Safari 'ghosting' bug te blokkeren */}
-                        <div className={`text-2xl font-mono font-bold leading-none py-0.5 -ml-1 px-1 rounded-md ${timer >= 600 ? 'text-red-500 bg-white animate-pulse' : 'text-slate-800'}`}>{formatTime(timer)}</div>
+                {/* TOPBAR - Rustige 2-polige layout (Tijd links, Score rechts) */}
+                <div className="flex-none h-20 bg-white/95 backdrop-blur-md border-b border-slate-200 px-5 z-50 flex items-center justify-between shadow-sm">
+                    
+                    {/* Linker Anker: Kwart & Tijd */}
+                    <div className="flex flex-col items-start justify-center">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1.5">Kwart {quarter}</span>
+                        <div className={`text-3xl font-mono font-black tracking-tight leading-none ${timer >= 600 ? 'text-red-500 animate-pulse' : 'text-slate-800'}`}>{formatTime(timer)}</div>
                     </div>
-                    <div className="flex-1 flex flex-col items-center justify-center">
-                        <div className="flex items-center bg-slate-50 rounded-full border border-slate-200 px-2 py-1 shadow-sm">
+
+                    {/* Rechter Anker: Tegenstander & Scorebord */}
+                    <div className="flex flex-col items-end justify-center">
+                        <div className="text-[10px] text-slate-400 font-semibold truncate max-w-[150px] leading-none mb-1.5 uppercase tracking-wide">
+                            Nwk <span className="text-slate-300 font-normal mx-0.5">vs</span> {safeOpponent.name}
+                        </div>
+                        <div className="flex items-center bg-slate-50 rounded-full border border-slate-200 px-1.5 py-1 shadow-sm">
                             <div className="flex items-center gap-1">
-                                <button onClick={() => score.home > 0 && setShowUndoGoalModal(true)} className="w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-red-500 flex items-center justify-center font-bold active:scale-90 transition-transform"><Icons.Minus size={14} /></button>
-                                <span className="w-8 text-center text-2xl font-black text-slate-800 font-mono">{score.home}</span>
-                                <button onClick={() => setShowGoalModal(true)} className="w-8 h-8 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold shadow-sm active:scale-90 transition-transform"><Icons.Plus size={16} /></button>
+                                <button onClick={() => score.home > 0 && setShowUndoGoalModal(true)} className="w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-400 hover:text-red-500 flex items-center justify-center font-bold active:scale-90 transition-transform"><Icons.Minus size={14} /></button>
+                                <span className="w-7 text-center text-xl font-black text-slate-800 font-mono">{score.home}</span>
+                                <button onClick={() => setShowGoalModal(true)} className="w-7 h-7 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold shadow-sm active:scale-90 transition-transform"><Icons.Plus size={16} /></button>
                             </div>
-                            <span className="text-slate-300 mx-2 text-xl font-light">|</span>
+                            <span className="text-slate-300 mx-1.5 text-lg font-light">|</span>
                             <div className="flex items-center gap-1">
-                                <button onClick={() => setScore(s => ({ ...s, away: Math.max(0, s.away - 1) }))} className={`w-8 h-8 rounded-full bg-white border border-slate-200 text-slate-400 hover:${oppColor.text} flex items-center justify-center font-bold active:scale-90 transition-transform`}><Icons.Minus size={14} /></button>
-                                <span className={`w-8 text-center text-2xl font-black ${oppColor.text} font-mono`}>{score.away}</span>
-                                <button onClick={() => setScore(s => ({ ...s, away: s.away + 1 }))} className={`w-8 h-8 rounded-full ${oppColor.bg} text-white flex items-center justify-center font-bold shadow-sm active:scale-90 transition-transform`}><Icons.Plus size={16} /></button>
+                                <button onClick={() => setScore(s => ({ ...s, away: Math.max(0, s.away - 1) }))} className={`w-7 h-7 rounded-full bg-white border border-slate-200 text-slate-400 hover:${oppColor.text} flex items-center justify-center font-bold active:scale-90 transition-transform`}><Icons.Minus size={14} /></button>
+                                <span className={`w-7 text-center text-xl font-black ${oppColor.text} font-mono`}>{score.away}</span>
+                                <button onClick={() => setScore(s => ({ ...s, away: s.away + 1 }))} className={`w-7 h-7 rounded-full ${oppColor.bg} text-white flex items-center justify-center font-bold shadow-sm active:scale-90 transition-transform`}><Icons.Plus size={16} /></button>
                             </div>
                         </div>
-                        <div className="mt-1.5 text-[10px] text-slate-500 font-semibold truncate max-w-[220px] text-center">Nieuwerkerk <span className="text-slate-300 mx-1 font-normal">vs</span> {safeOpponent.name}</div>
                     </div>
-                    <div className="w-20 flex justify-end">
-                        <button onClick={() => setView(prev => (prev === 'setup' ? 'field' : 'setup'))} className={`p-2 rounded-xl border transition-colors ${view === 'setup' ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}><Icons.Settings size={20} /></button>
-                    </div>
+
                 </div>
 
                 {/* MAIN CONTENT */}
-                <div className="flex-1 relative overflow-hidden bg-slate-50 w-full">
+                <div className="flex-1 relative overflow-hidden bg-slate-50 w-full min-h-[450px]">
                     {view === 'field' && <FieldView players={players} selectedId={selectedId} onSlotClick={handleInteraction} formation={formation} />}
                     {view === 'stats' && <StatsView players={players} sortConfig={sortConfig} onChangeSort={setSortConfig} />}
                     
@@ -933,53 +933,60 @@
                     )}
                 </div>
 
-                {/* FOOTER (Licht Thema) */}
-                <div className="flex-none bg-white border-t border-slate-200 z-50">
-                    {view !== 'setup' && (
-                        <>
-                            <div className="flex border-b border-slate-100">
-                                {[{ id: 'field', label: 'Veld', icon: Icons.Trophy }, { id: 'stats', label: 'Stats', icon: Icons.ClipboardCheck }, { id: 'log', label: 'Log', icon: Icons.Clock }, { id: 'season', label: 'Seizoen', icon: Icons.History }].map(tab => (
-                                    <button key={tab.id} onClick={() => setView(tab.id)} className={`flex-1 py-3.5 flex flex-col items-center justify-center gap-1 transition-colors ${view === tab.id ? 'text-indigo-600 bg-indigo-50/50 border-b-2 border-indigo-500' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}>
-                                        <tab.icon size={18} /><span className="text-[9px] font-bold uppercase tracking-widest">{tab.label}</span>
-                                    </button>
-                                ))}
+                {/* FOOTER - Met 5 tabbladen, setup knop is hier nu onderdeel van */}
+                <div className="flex-none bg-white border-t border-slate-200 z-50 pb-[env(safe-area-inset-bottom)]">
+                    
+                    {/* Tabbladen Navigatie (Altijd zichtbaar) */}
+                    <div className="flex border-b border-slate-100">
+                        {[
+                            { id: 'field', label: 'Veld', icon: Icons.Trophy }, 
+                            { id: 'stats', label: 'Stats', icon: Icons.ClipboardCheck }, 
+                            { id: 'log', label: 'Log', icon: Icons.Clock }, 
+                            { id: 'season', label: 'Seizoen', icon: Icons.History },
+                            { id: 'setup', label: 'Opties', icon: Icons.Settings }
+                        ].map(tab => (
+                            <button key={tab.id} onClick={() => setView(tab.id)} className={`flex-1 py-3 flex flex-col items-center justify-center gap-1 transition-colors ${view === tab.id ? 'text-indigo-600 bg-indigo-50/50 border-b-2 border-indigo-500' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}>
+                                <tab.icon size={18} /><span className="text-[9px] font-bold uppercase tracking-widest truncate w-full text-center px-1">{tab.label}</span>
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Wisselbank & Knoppen (Alleen zichtbaar bij actieve coaching tabs) */}
+                    {(view === 'field' || view === 'stats' || view === 'log') && (
+                        <div className="p-4 pt-3">
+                            <div className="mb-2 px-1 flex justify-between items-end">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Wisselbank ({benchPlayers.length})</span>
                             </div>
-                            <div className="p-4 pt-3">
-                                {view === 'season' ? (
-                                    <div className="text-center text-xs font-medium text-slate-400 py-5">Archief Modus</div>
-                                ) : (
-                                    <>
-                                        <div className="mb-2 px-1 flex justify-between items-end">
-                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Wisselbank ({benchPlayers.length})</span>
-                                        </div>
-                                        <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide min-h-[80px]">
-                                            {benchPlayers.length > 0 ? benchPlayers.map(p => (
-                                                <div key={p.id} onClick={() => handleInteraction(p.id)} className="flex-shrink-0 cursor-pointer">
-                                                    <PlayerToken name={p.name} initials={getInitials(p.name)} goals={p.goals} isSelected={p.id === selectedId} benchTime={p.benchTime} showBenchTimer />
-                                                </div>
-                                            )) : <div className="w-full text-center text-slate-400 font-medium text-xs py-4 border-2 border-dashed border-slate-200 rounded-xl">Iedereen staat in het veld!</div>}
-                                        </div>
-                                        <div className="flex gap-3 mt-1">
-                                            <button onClick={toggleTimer} className={`flex-1 py-4 rounded-xl font-bold text-sm shadow-sm border flex items-center justify-center gap-2 transform active:scale-95 transition-all ${isRunning ? 'bg-white border-amber-200 text-amber-600 ring-2 ring-amber-100' : 'bg-emerald-500 border-emerald-500 text-white shadow-emerald-500/30 shadow-lg hover:bg-emerald-600'}`}>
-                                                {isRunning ? <><Icons.Pause size={18} /> PAUZE</> : <><Icons.Play size={18} /> START</>}
-                                            </button>
-                                            <button onClick={() => {
-                                                if (quarter === 4) {
-                                                    setShowEndModal(true);
-                                                } else {
-                                                    setConfirmDialog({
-                                                        message: `Volgend kwart (Kwart ${quarter + 1}) starten?\n\nDe tijd wordt gereset naar 00:00.`,
-                                                        onConfirm: () => { setQuarter(q => q + 1); setTimer(0); setIsRunning(false); }
-                                                    });
-                                                }
-                                            }} className={`px-6 py-3 rounded-xl font-bold text-[10px] shadow-sm flex flex-col items-center justify-center leading-none transform active:scale-95 transition-all border ${quarter === 4 ? 'bg-red-500 border-red-500 text-white animate-pulse' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-                                                {quarter === 4 ? <span className="text-xs">EINDE</span> : <><span className="mb-0.5"><Icons.FastForward size={14} /></span>KWART</>}
-                                            </button>
-                                        </div>
-                                    </>
-                                )}
+                            <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide min-h-[80px]">
+                                {benchPlayers.length > 0 ? benchPlayers.map(p => (
+                                    <div key={p.id} onClick={() => handleInteraction(p.id)} className="flex-shrink-0 cursor-pointer">
+                                        <PlayerToken name={p.name} initials={getInitials(p.name)} goals={p.goals} isSelected={p.id === selectedId} benchTime={p.benchTime} showBenchTimer />
+                                    </div>
+                                )) : <div className="w-full text-center text-slate-400 font-medium text-xs py-4 border-2 border-dashed border-slate-200 rounded-xl">Iedereen staat in het veld!</div>}
                             </div>
-                        </>
+                            <div className="flex gap-3 mt-3">
+                                <button onClick={toggleTimer} className={`flex-1 py-4 rounded-xl font-bold text-sm shadow-sm border flex items-center justify-center gap-2 transform active:scale-95 transition-all ${isRunning ? 'bg-white border-amber-200 text-amber-600 ring-2 ring-amber-100' : 'bg-emerald-500 border-emerald-500 text-white shadow-emerald-500/30 shadow-lg hover:bg-emerald-600'}`}>
+                                    {isRunning ? <><Icons.Pause size={18} /> PAUZE</> : <><Icons.Play size={18} /> START</>}
+                                </button>
+                                <button onClick={() => {
+                                    if (quarter === 4) {
+                                        setShowEndModal(true);
+                                    } else {
+                                        setConfirmDialog({
+                                            message: `Volgend kwart (Kwart ${quarter + 1}) starten?\n\nDe tijd wordt gereset naar 00:00.`,
+                                            onConfirm: () => { setQuarter(q => q + 1); setTimer(0); setIsRunning(false); }
+                                        });
+                                    }
+                                }} className={`px-6 py-3 rounded-xl font-bold text-[10px] shadow-sm flex flex-col items-center justify-center leading-none transform active:scale-95 transition-all border ${quarter === 4 ? 'bg-red-500 border-red-500 text-white animate-pulse' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                                    {quarter === 4 ? <span className="text-xs">EINDE</span> : <><span className="mb-0.5"><Icons.FastForward size={14} /></span>KWART</>}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Vulling/Feedback voor Archief Modus, geen knoppen */}
+                    {view === 'season' && (
+                        <div className="text-center text-xs font-medium text-slate-400 py-5">Archief Modus</div>
                     )}
                 </div>
             </div>
