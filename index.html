@@ -76,13 +76,15 @@
 </script>
 
 <!-- Scripts verplaatst naar onderen voor snellere 'first paint' van de body -->
-<!-- Productie versies laden aanzienlijk sneller in iOS PWA modus -->
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<!-- Productie versies laden aanzienlijk sneller en gebruiken stabiele CDN (cdnjs) zonder redirects -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.22.20/babel.min.js" crossorigin="anonymous"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 
-<script type="text/babel">
+<!-- We veranderen type="text/babel" naar type="text/plain" en geven het een ID. 
+     Hierdoor leest de browser dit als pure tekst en crasht hij niet stilletjes. -->
+<script id="react-app-code" type="text/plain">
     const { useState, useEffect, useRef, useCallback, useMemo, memo } = React;
 
     // --------------------------------------------------------------------
@@ -392,7 +394,6 @@
                                 <tr key={p.id} className="hover:bg-white/5">
                                     <td className="p-3 pl-4">
                                         <div className="font-medium">{p.name}</div>
-                                        {/* Slimme toevoeging: Visuele heatmap van posities */}
                                         {totalPosTime > 0 && (
                                             <div className="flex w-full max-w-[80px] h-1 mt-1.5 rounded overflow-hidden bg-slate-700 opacity-80">
                                                 {stats.k > 0 && <div style={{width: `${(stats.k/totalPosTime)*100}%`}} className="bg-yellow-500" title="Keeper" />}
@@ -411,7 +412,6 @@
                     </table>
                 </div>
                 
-                {/* Legenda voor de heatmap */}
                 <div className="flex gap-3 text-[10px] text-slate-400 justify-center">
                     <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500"></span>Keeper</span>
                     <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500"></span>Verdediging</span>
@@ -485,7 +485,6 @@
                 <button onClick={onCopyReport} className="w-full bg-emerald-600 hover:bg-emerald-500 py-3 rounded-lg font-bold flex items-center justify-center gap-2 text-white"><Icons.ClipboardCheck size={18} /> Kopieer Verslag</button>
                 <button onClick={onResetMatch} className="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-lg font-bold flex items-center justify-center gap-2 text-white"><Icons.RotateCcw size={18} /> Reset Huidige Wedstrijd</button>
                 
-                {/* Data Controle Opties */}
                 <div className="flex gap-2">
                     <button onClick={onExportData} className="flex-1 bg-slate-700 hover:bg-slate-600 py-3 rounded-lg font-bold flex items-center justify-center gap-2 text-white text-[10px] uppercase">
                         <Icons.Save size={14} /> Backup
@@ -524,7 +523,6 @@
     // --------------------------------------------------------------------
 
     function App() {
-        // STATE -----------------------------------------------------------
         const [players, setPlayers] = useThrottledStorage(`${STORAGE_VERSION}_players`, getFreshPlayers(), 5000);
         const [timer, setTimer] = useThrottledStorage(`${STORAGE_VERSION}_timer`, 0, 5000);
         const [history, setHistory] = useThrottledStorage(`${STORAGE_VERSION}_history`, [], 5000);
@@ -555,7 +553,6 @@
         
         const currentPositions = FORMATIONS[formation].positions;
 
-        // CALLBACKS
         const handleOpponentNameChange = useCallback((n) => setOpponent(o => ({ ...o, name: n })), [setOpponent]);
         const handleOpponentColorChange = useCallback((c) => setOpponent(o => ({ ...o, colorId: c })), [setOpponent]);
         const handleRemovePlayer = useCallback((id) => confirm('Wissen?') && setPlayers(curr => curr.filter(p => p.id !== id)), [setPlayers]);
@@ -574,7 +571,6 @@
             }));
         }, [setFormation, setPlayers]);
 
-        // Export/Import Logica voor controle over eigen data
         const handleExportData = useCallback(() => {
             const backupData = {
                 version: STORAGE_VERSION,
@@ -617,9 +613,6 @@
             };
             reader.readAsText(file);
         }, [setPlayers, setArchive, setOpponent, setHistory, setScore, setQuarter, setFormation]);
-
-
-        // LOGIC -----------------------------------------------------------
 
         const handleInteraction = useCallback((targetId, targetPos = null) => {
             if (selectedId === null) {
@@ -945,9 +938,40 @@
             </div>
         );
     }
+</script>
 
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
+<!-- Nieuwe gecontroleerde opstart-logica -->
+<script>
+    window.addEventListener('load', function() {
+        // Geef het scherm 150ms de tijd om soepel te renderen en de iPhone op adem te laten komen
+        setTimeout(function() {
+            try {
+                // We halen de ruwe tekst op
+                const rawCode = document.getElementById('react-app-code').textContent;
+                
+                // We geven expliciet de opdracht aan Babel om het te compileren
+                const compiledCode = Babel.transform(rawCode, { presets: ['react', 'env'] }).code;
+                
+                // We voeren het uit via een nieuw, schoon functie-object (dit is stabieler dan globale eval)
+                const runReactApp = new Function(compiledCode + '\nReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));');
+                runReactApp();
+                
+            } catch (error) {
+                // Als iOS het proces probeert af te kappen of Babel struikelt over een specifieke syntax,
+                // dan forceren we de foutmelding hier hard op het scherm.
+                const root = document.getElementById('root');
+                if (root) {
+                    root.innerHTML = '<div style="padding: 24px; color: #ef4444; font-family: monospace; font-size: 13px; word-wrap: break-word; background-color: #0f172a; height: 100vh;">' +
+                        '<h3 style="font-weight: bold; font-size: 16px; margin-bottom: 8px;">Compilatiefout Babel</h3>' + 
+                        (error.message || 'Onbekende fout tijdens vertalen code.') +
+                        '<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #1e293b;">' +
+                        '<button onclick="localStorage.clear(); sessionStorage.clear(); window.location.reload();" style="padding: 12px 20px; background: #ef4444; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 14px; width: 100%;">Forceer Reset</button>' +
+                        '</div></div>';
+                }
+                console.error("Babel error: ", error);
+            }
+        }, 150);
+    });
 </script>
 </body>
 </html>
