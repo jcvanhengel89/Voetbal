@@ -2,26 +2,23 @@
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Coach App JO9-10 (Flexible)</title>
     <meta name="theme-color" content="#0f172a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-    <!-- React + Babel + Tailwind -->
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-
     <style>
-        body {
+        /* HTML ook een achtergrondkleur geven voorkomt de iOS witte flits tijdens laden */
+        html, body {
+            background-color: #0f172a;
             overscroll-behavior-y: none;
             user-select: none;
             -webkit-user-select: none;
-            background-color: #0f172a;
             font-family: system-ui, -apple-system, sans-serif;
             -webkit-tap-highlight-color: transparent;
+            margin: 0;
+            padding: 0;
         }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
@@ -33,10 +30,32 @@
             from { opacity: 0; }
             to   { opacity: 1; }
         }
+        
+        /* Simpele animatie voor het laadscherm */
+        @keyframes pulse-slow {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+        .animate-pulse-slow {
+            animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
     </style>
 </head>
 <body class="bg-slate-900 text-white h-screen w-full overflow-hidden">
-<div id="root" class="h-full w-full"></div>
+    
+<!-- Prikkelarme laad-indicator (verdwijnt zodra React klaar is met laden) -->
+<div id="root" class="h-full w-full flex items-center justify-center">
+    <div class="text-slate-500 font-mono text-sm animate-pulse-slow">
+        App wordt geladen...
+    </div>
+</div>
+
+<!-- Scripts verplaatst naar onderen voor snellere 'first paint' van de body -->
+<!-- Productie versies laden aanzienlijk sneller in iOS PWA modus -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
 
 <script type="text/babel">
     const { useState, useEffect, useRef, useCallback, useMemo, memo } = React;
