@@ -44,7 +44,7 @@
     // --------------------------------------------------------------------
     // CONSTANTEN & CONFIG
     // --------------------------------------------------------------------
-    const STORAGE_VERSION = 'v32_flex'; // Versie bump voor nieuwe formatie data
+    const STORAGE_VERSION = 'v32_flex';
 
     // Definieer de mogelijke formaties
     const FORMATIONS = {
@@ -64,7 +64,7 @@
             positions: {
                 k:  { label: 'K',   top: 90, left: 50, type: 'k' },
                 lv: { label: 'LV',  top: 70, left: 15, type: 'def' },
-                cv: { label: 'CV',  top: 75, left: 50, type: 'def' }, // Extra
+                cv: { label: 'CV',  top: 75, left: 50, type: 'def' },
                 rv: { label: 'RV',  top: 70, left: 85, type: 'def' },
                 m:  { label: 'MID', top: 45, left: 50, type: 'mid' },
                 la: { label: 'LA',  top: 20, left: 20, type: 'att' },
@@ -78,8 +78,8 @@
                 lv: { label: 'LV',  top: 75, left: 15, type: 'def' },
                 cv: { label: 'CV',  top: 80, left: 50, type: 'def' },
                 rv: { label: 'RV',  top: 75, left: 85, type: 'def' },
-                lm: { label: 'LM',  top: 50, left: 30, type: 'mid' }, // Split mid
-                rm: { label: 'RM',  top: 50, left: 70, type: 'mid' }, // Split mid
+                lm: { label: 'LM',  top: 50, left: 30, type: 'mid' },
+                rm: { label: 'RM',  top: 50, left: 70, type: 'mid' },
                 la: { label: 'LA',  top: 25, left: 20, type: 'att' },
                 ra: { label: 'RA',  top: 25, left: 80, type: 'att' },
             }
@@ -215,6 +215,7 @@
         Clock: (p) => <Icon {...p} path={<><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>} />,
         RotateCcw: (p) => <Icon {...p} path={<><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></>} />,
         Save: (p) => <Icon {...p} path={<><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></>} />,
+        Upload: (p) => <Icon {...p} path={<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></>} />,
         Settings: (p) => <Icon {...p} path={<><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></>} />,
         Users: (p) => <Icon {...p} path={<><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></>} />,
         History: (p) => <Icon {...p} path={<><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></>} />,
@@ -266,7 +267,6 @@
     });
 
     const FieldView = memo(({ players, selectedId, onSlotClick, formation }) => {
-        // Haal posities op uit de actieve formatie
         const positions = FORMATIONS[formation].positions;
 
         return (
@@ -329,7 +329,7 @@
         return (
             <div className="absolute inset-0 overflow-y-auto p-4 max-w-md mx-auto">
                 <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Live Statistieken</h2>
-                <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
+                <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden mb-4">
                     <table className="w-full text-sm text-left">
                         <thead className="bg-slate-900/50 text-slate-400 text-[10px] uppercase font-bold">
                             <tr>
@@ -340,22 +340,45 @@
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-700 text-white">
-                            {sortedPlayers.map(p => (
+                            {sortedPlayers.map(p => {
+                                const stats = p.posStats || { k:0, def:0, mid:0, att:0 };
+                                const totalPosTime = stats.k + stats.def + stats.mid + stats.att;
+                                
+                                return (
                                 <tr key={p.id} className="hover:bg-white/5">
-                                    <td className="p-3 pl-4 font-medium">{p.name}</td>
-                                    <td className={`text-center font-bold ${p.goals > 0 ? 'text-yellow-400' : ''}`}>{p.goals || '-'}</td>
-                                    <td className={`text-right font-mono ${p.pos === null ? 'text-orange-400 font-bold' : ''}`}>{formatTime(p.benchTime)}</td>
-                                    <td className="text-right pr-4 font-mono text-slate-400">{formatTime(p.playTime)}</td>
+                                    <td className="p-3 pl-4">
+                                        <div className="font-medium">{p.name}</div>
+                                        {/* Slimme toevoeging: Visuele heatmap van posities */}
+                                        {totalPosTime > 0 && (
+                                            <div className="flex w-full max-w-[80px] h-1 mt-1.5 rounded overflow-hidden bg-slate-700 opacity-80">
+                                                {stats.k > 0 && <div style={{width: `${(stats.k/totalPosTime)*100}%`}} className="bg-yellow-500" title="Keeper" />}
+                                                {stats.def > 0 && <div style={{width: `${(stats.def/totalPosTime)*100}%`}} className="bg-blue-500" title="Verdediging" />}
+                                                {stats.mid > 0 && <div style={{width: `${(stats.mid/totalPosTime)*100}%`}} className="bg-green-500" title="Middenveld" />}
+                                                {stats.att > 0 && <div style={{width: `${(stats.att/totalPosTime)*100}%`}} className="bg-red-500" title="Aanval" />}
+                                            </div>
+                                        )}
+                                    </td>
+                                    <td className={`text-center font-bold align-top pt-3 ${p.goals > 0 ? 'text-yellow-400' : ''}`}>{p.goals || '-'}</td>
+                                    <td className={`text-right font-mono align-top pt-3 ${p.pos === null ? 'text-orange-400 font-bold' : ''}`}>{formatTime(p.benchTime)}</td>
+                                    <td className="text-right pr-4 font-mono text-slate-400 align-top pt-3">{formatTime(p.playTime)}</td>
                                 </tr>
-                            ))}
+                            )})}
                         </tbody>
                     </table>
+                </div>
+                
+                {/* Legenda voor de heatmap */}
+                <div className="flex gap-3 text-[10px] text-slate-400 justify-center">
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-500"></span>Keeper</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500"></span>Verdediging</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500"></span>Midden</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500"></span>Aanval</span>
                 </div>
             </div>
         );
     });
 
-    const SetupView = memo(({ players, opponent, formation, onFormationChange, onOpponentNameChange, onOpponentColorChange, onRemovePlayer, onChangePlayerName, onTogglePresence, onCopyReport, onResetMatch, onFactoryReset, onAddPlayer }) => (
+    const SetupView = memo(({ players, opponent, formation, onFormationChange, onOpponentNameChange, onOpponentColorChange, onRemovePlayer, onChangePlayerName, onTogglePresence, onCopyReport, onResetMatch, onFactoryReset, onAddPlayer, onExportData, onImportData }) => (
         <div className="absolute inset-0 overflow-y-auto p-4 max-w-md mx-auto bg-slate-900 z-20">
             <h2 className="text-lg font-bold mb-4 flex items-center gap-2 text-white">
                 <Icons.Settings size={20} /> Instellingen
@@ -364,7 +387,6 @@
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Icons.Swords size={14} /> Wedstrijd Info</h3>
                 <div className="space-y-4">
                     
-                    {/* FORMATIE KIEZER */}
                     <div>
                         <label className="text-xs text-slate-500 block mb-2 flex items-center gap-1">
                             <Icons.Layout size={12} /> Formatie
@@ -414,10 +436,23 @@
                 ))}
                 <button onClick={onAddPlayer} className="w-full py-3 border-2 border-dashed border-slate-700 text-slate-400 rounded-lg hover:border-slate-500 hover:text-white transition-colors flex items-center justify-center gap-2"><Icons.Plus size={16} /> Speler Toevoegen</button>
             </div>
+            
             <div className="border-t border-slate-700 pt-4 space-y-3">
                 <button onClick={onCopyReport} className="w-full bg-emerald-600 hover:bg-emerald-500 py-3 rounded-lg font-bold flex items-center justify-center gap-2 text-white"><Icons.ClipboardCheck size={18} /> Kopieer Verslag</button>
                 <button onClick={onResetMatch} className="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-lg font-bold flex items-center justify-center gap-2 text-white"><Icons.RotateCcw size={18} /> Reset Huidige Wedstrijd</button>
-                <button onClick={onFactoryReset} className="w-full text-red-500 py-2 text-xs flex items-center justify-center gap-1"><Icons.AlertTriangle size={12} /> Alles Wissen</button>
+                
+                {/* Data Controle Opties */}
+                <div className="flex gap-2">
+                    <button onClick={onExportData} className="flex-1 bg-slate-700 hover:bg-slate-600 py-3 rounded-lg font-bold flex items-center justify-center gap-2 text-white text-[10px] uppercase">
+                        <Icons.Save size={14} /> Backup
+                    </button>
+                    <label className="flex-1 bg-slate-700 hover:bg-slate-600 py-3 rounded-lg font-bold flex items-center justify-center gap-2 text-white text-[10px] uppercase cursor-pointer">
+                        <Icons.Upload size={14} /> Laad in
+                        <input type="file" accept=".json" onChange={onImportData} className="hidden" />
+                    </label>
+                </div>
+
+                <button onClick={onFactoryReset} className="w-full text-red-500 py-2 text-xs flex items-center justify-center gap-1 mt-2"><Icons.AlertTriangle size={12} /> Alles Wissen</button>
             </div>
         </div>
     ));
@@ -451,7 +486,7 @@
         const [history, setHistory] = useThrottledStorage(`${STORAGE_VERSION}_history`, [], 5000);
         const [score, setScore] = useThrottledStorage(`${STORAGE_VERSION}_score`, { home: 0, away: 0 }, 5000);
         const [quarter, setQuarter] = useThrottledStorage(`${STORAGE_VERSION}_quarter`, 1, 5000);
-        const [formation, setFormation] = useThrottledStorage(`${STORAGE_VERSION}_formation`, '6v6', 5000); // Nieuw
+        const [formation, setFormation] = useThrottledStorage(`${STORAGE_VERSION}_formation`, '6v6', 5000);
         
         const [archive, setArchive] = useState(() => { try { return JSON.parse(localStorage.getItem(`${STORAGE_VERSION}_archive`) || '[]'); } catch { return []; }});
         const [opponent, setOpponent] = useState(() => { try { return JSON.parse(localStorage.getItem(`${STORAGE_VERSION}_opponent`) || JSON.stringify({ name: 'Tegenstander', colorId: 'blue' })); } catch { return { name: 'Tegenstander', colorId: 'blue' }; }});
@@ -474,7 +509,6 @@
         const safeOpponent = opponent || { name: 'Tegenstander', colorId: 'blue' };
         const oppColor = TEAM_COLORS.find(c => c.id === safeOpponent.colorId) || TEAM_COLORS[0];
         
-        // Actieve posities ophalen
         const currentPositions = FORMATIONS[formation].positions;
 
         // CALLBACKS
@@ -485,18 +519,61 @@
         const handleTogglePresence = useCallback((id) => setPlayers(curr => curr.map(p => p.id === id ? { ...p, present: !p.present, pos: !p.present ? p.pos : null } : p)), [setPlayers]);
         const handleAddPlayer = useCallback(() => setPlayers(curr => [...curr, { id: Date.now(), name: 'Nieuw', pos: null, benchTime: 0, playTime: 0, benchCount: 0, goals: 0, present: true, posStats: {k:0,def:0,mid:0,att:0} }]), [setPlayers]);
         
-        // Logica voor wisselen formatie: spelers op 'dode' posities resetten naar bank
         const handleFormationChange = useCallback((newFormat) => {
             setFormation(newFormat);
             const newPositions = FORMATIONS[newFormat].positions;
             setPlayers(curr => curr.map(p => {
-                // Als speler een positie heeft die niet bestaat in nieuwe formatie -> naar bank
                 if (p.pos && !newPositions[p.pos]) {
                     return { ...p, pos: null };
                 }
                 return p;
             }));
         }, [setFormation, setPlayers]);
+
+        // Export/Import Logica voor controle over eigen data
+        const handleExportData = useCallback(() => {
+            const backupData = {
+                version: STORAGE_VERSION,
+                date: new Date().toISOString(),
+                data: { players, archive, opponent, history, score, quarter, formation }
+            };
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData));
+            const dlAnchor = document.createElement('a');
+            dlAnchor.setAttribute("href", dataStr);
+            dlAnchor.setAttribute("download", `coach_app_backup_${new Date().toLocaleDateString('nl-NL')}.json`);
+            document.body.appendChild(dlAnchor);
+            dlAnchor.click();
+            dlAnchor.remove();
+        }, [players, archive, opponent, history, score, quarter, formation]);
+
+        const handleImportData = useCallback((e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                try {
+                    const imported = JSON.parse(event.target.result);
+                    if (imported && imported.data) {
+                        if (confirm('Let op: Dit overschrijft je huidige status met de data uit de backup. Doorgaan?')) {
+                            if (imported.data.players) setPlayers(imported.data.players);
+                            if (imported.data.archive) setArchive(imported.data.archive);
+                            if (imported.data.opponent) setOpponent(imported.data.opponent);
+                            if (imported.data.history) setHistory(imported.data.history);
+                            if (imported.data.score) setScore(imported.data.score);
+                            if (imported.data.quarter) setQuarter(imported.data.quarter);
+                            if (imported.data.formation) setFormation(imported.data.formation);
+                            alert("Backup succesvol hersteld!");
+                        }
+                    } else {
+                        alert("Ongeldig backup bestand (verkeerd formaat).");
+                    }
+                } catch (err) {
+                    alert("Fout bij het inladen van bestand.");
+                }
+            };
+            reader.readAsText(file);
+        }, [setPlayers, setArchive, setOpponent, setHistory, setScore, setQuarter, setFormation]);
+
 
         // LOGIC -----------------------------------------------------------
 
@@ -558,7 +635,6 @@
                     if (!p.present) return p;
                     if (p.pos === null) return { ...p, benchTime: p.benchTime + 1 };
                     
-                    // Gebruik currentPositions voor stats check
                     const posInfo = currentPositions[p.pos];
                     if (!posInfo) return p;
 
@@ -610,7 +686,6 @@
             navigator.clipboard.writeText(report).then(() => alert('Gekopieerd!')).catch(() => prompt('Kopieer handmatig:', report));
         };
 
-        // GECENTRALISEERDE RESET FUNCTIE
         const performReset = useCallback(() => {
             setIsRunning(false);
             setScore({ home: 0, away: 0 });
@@ -777,6 +852,8 @@
                             onCopyReport={copyReport}
                             onResetMatch={resetMatch}
                             onFactoryReset={factoryReset}
+                            onExportData={handleExportData}
+                            onImportData={handleImportData}
                         />
                     )}
                 </div>
@@ -830,4 +907,3 @@
 </script>
 </body>
 </html>
-
