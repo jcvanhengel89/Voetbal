@@ -50,6 +50,31 @@
     </div>
 </div>
 
+<!-- Vangnet: Foutmeldingen direct op het scherm printen om 'witte schermen' te voorkomen -->
+<script>
+    window.addEventListener('error', function(event) {
+        const root = document.getElementById('root');
+        if (root) {
+            root.innerHTML = '<div style="padding: 24px; color: #ef4444; font-family: monospace; font-size: 13px; word-wrap: break-word; background-color: #0f172a; height: 100vh;">' +
+                '<h3 style="font-weight: bold; font-size: 16px; margin-bottom: 8px;">Systeemfout</h3>' + 
+                (event.message || 'Onbekende fout bij inladen scripts.') + '<br/><br/>' +
+                '<span style="color: #64748b;">Bestand: ' + (event.filename || 'onbekend') + '</span><br/>' +
+                '<span style="color: #64748b;">Regel: ' + (event.lineno || '?') + '</span>' +
+                '<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #1e293b;">' +
+                '<p style="color: #94a3b8; margin-bottom: 15px;">Mogelijk zit er corrupte data in het geheugen. Gebruik de knop hieronder om de opslag te forceren en schoon te beginnen.</p>' +
+                '<button onclick="localStorage.clear(); sessionStorage.clear(); window.location.reload();" style="padding: 12px 20px; background: #ef4444; color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 14px; width: 100%;">Forceer Reset (Wis Lokale Data)</button>' +
+                '</div></div>';
+        }
+    });
+    
+    window.addEventListener('unhandledrejection', function(event) {
+        const root = document.getElementById('root');
+        if (root) {
+            root.innerHTML = '<div style="padding: 24px; color: #eab308; font-family: monospace; font-size: 13px; word-wrap: break-word; background-color: #0f172a; height: 100vh;"><strong>Async Fout:</strong><br/>' + (event.reason || 'Onbekende belofte/netwerk fout') + '</div>';
+        }
+    });
+</script>
+
 <!-- Scripts verplaatst naar onderen voor snellere 'first paint' van de body -->
 <!-- Productie versies laden aanzienlijk sneller in iOS PWA modus -->
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
