@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { clearAppStorage, storageKey } from './lib/storage';
 import { FORMATIONS, TEAM_COLORS, getFreshPlayers, formatTime, getBench, getField, getScorers, Icons } from './lib/game.jsx';
 import { useWakeLock } from './hooks/useWakeLock';
@@ -32,6 +32,7 @@ function App() {
   const [showEndModal, setShowEndModal] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState(null);
+  const lastTickAtRef = useRef(null);
 
   useWakeLock(isRunning);
 
@@ -96,6 +97,25 @@ function App() {
     reader.readAsText(file);
   }, [setPlayers, setArchive, setOpponent, setHistory, setScore, setQuarter, setFormation]);
 
+  const applyElapsedSeconds = useCallback((elapsedSeconds) => {
+    if (elapsedSeconds <= 0) return;
+
+    setTimer((t) => t + elapsedSeconds);
+    setPlayers((curr) => curr.map((p) => {
+      if (!p.present) return p;
+      if (p.pos === null) return { ...p, benchTime: p.benchTime + elapsedSeconds };
+      const posInfo = currentPositions[p.pos];
+      if (!posInfo) return p;
+      const posType = posInfo.type || 'mid';
+      const stats = p.posStats || { k: 0, def: 0, mid: 0, att: 0 };
+      return {
+        ...p,
+        playTime: p.playTime + elapsedSeconds,
+        posStats: { ...stats, [posType]: stats[posType] + elapsedSeconds },
+      };
+    }));
+  }, [currentPositions, setPlayers, setTimer]);
+
   const handleInteraction = useCallback((targetId, targetPos = null) => {
     if (selectedId === null) {
       if (targetId) setSelectedId(targetId);
@@ -145,21 +165,36 @@ function App() {
   }, [selectedId, players, isRunning, quarter, timer, setPlayers, setHistory]);
 
   useEffect(() => {
-    if (!isRunning) return;
-    const interval = setInterval(() => {
-      setTimer((t) => t + 1);
-      setPlayers((curr) => curr.map((p) => {
-        if (!p.present) return p;
-        if (p.pos === null) return { ...p, benchTime: p.benchTime + 1 };
-        const posInfo = currentPositions[p.pos];
-        if (!posInfo) return p;
-        const posType = posInfo.type || 'mid';
-        const stats = p.posStats || { k: 0, def: 0, mid: 0, att: 0 };
-        return { ...p, playTime: p.playTime + 1, posStats: { ...stats, [posType]: stats[posType] + 1 } };
-      }));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [isRunning, setTimer, setPlayers, currentPositions]);
+    if (!isRunning) {
+      lastTickAtRef.current = null;
+      return;
+    }
+
+    if (!lastTickAtRef.current) {
+      lastTickAtRef.current = Date.now();
+    }
+
+    const syncElapsedTime = () => {
+      const now = Date.now();
+      const lastTickAt = lastTickAtRef.current || now;
+      const elapsedSeconds = Math.floor((now - lastTickAt) / 1000);
+
+      if (elapsedSeconds > 0) {
+        applyElapsedSeconds(elapsedSeconds);
+        lastTickAtRef.current = lastTickAt + (elapsedSeconds * 1000);
+      }
+    };
+
+    const interval = setInterval(syncElapsedTime, 1000);
+    document.addEventListener('visibilitychange', syncElapsedTime);
+    window.addEventListener('focus', syncElapsedTime);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', syncElapsedTime);
+      window.removeEventListener('focus', syncElapsedTime);
+    };
+  }, [isRunning, applyElapsedSeconds]);
 
   useEffect(() => {
     if (showConfetti) {
@@ -172,8 +207,21 @@ function App() {
     if (!isRunning && timer === 0 && quarter === 1) {
       setPlayers((prev) => prev.map((p) => (p.pos === null && p.present ? { ...p, benchCount: p.benchCount + 1 } : p)));
     }
+
+    if (isRunning) {
+      const now = Date.now();
+      const lastTickAt = lastTickAtRef.current || now;
+      const elapsedSeconds = Math.floor((now - lastTickAt) / 1000);
+      if (elapsedSeconds > 0) {
+        applyElapsedSeconds(elapsedSeconds);
+      }
+      lastTickAtRef.current = null;
+    } else {
+      lastTickAtRef.current = Date.now();
+    }
+
     setIsRunning((prev) => !prev);
-  }, [isRunning, timer, quarter, setPlayers]);
+  }, [isRunning, timer, quarter, setPlayers, applyElapsedSeconds]);
 
   const registerGoal = (playerId) => {
     setScore((s) => ({ ...s, home: s.home + 1 }));
@@ -199,6 +247,7 @@ function App() {
 
   const performReset = useCallback(() => {
     setIsRunning(false);
+    lastTickAtRef.current = null;
     setScore({ home: 0, away: 0 });
     setTimer(0);
     setQuarter(1);
