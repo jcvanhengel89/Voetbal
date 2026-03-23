@@ -8,6 +8,21 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      window.addEventListener('error', function (event) {
+        const root = document.getElementById('root');
+        if (!root) return;
+        root.innerHTML = `
+          <div style="min-height:100dvh;padding:24px;font-family:system-ui,-apple-system,sans-serif;background:#f8fafc;color:#0f172a;display:flex;align-items:center;justify-content:center;">
+            <div style="max-width:560px;width:100%;background:white;border:1px solid #e2e8f0;border-radius:16px;padding:20px;box-shadow:0 10px 30px rgba(15,23,42,.08)">
+              <div style="font-weight:700;color:#dc2626;margin-bottom:12px">App-fout bij laden</div>
+              <div style="font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:13px; white-space:pre-wrap; word-break:break-word; color:#334155;">${event.message || 'Onbekende fout'}</div>
+              <div style="margin-top:12px;font-size:12px;color:#64748b;">${event.filename || ''}${event.lineno ? ' regel ' + event.lineno : ''}</div>
+              <button onclick="localStorage.clear(); location.reload();" style="margin-top:16px;padding:10px 14px;background:#0f172a;color:white;border:none;border-radius:10px;font-weight:600;">Wis lokale data en herlaad</button>
+            </div>
+          </div>`;
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>
