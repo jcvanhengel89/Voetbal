@@ -33,6 +33,7 @@ function App() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState(null);
   const lastTickAtRef = useRef(null);
+  const leftoverMsRef = useRef(0);
 
   useWakeLock(isRunning);
 
@@ -116,6 +117,22 @@ function App() {
     }));
   }, [currentPositions, setPlayers, setTimer]);
 
+  const syncElapsedTime = useCallback((now = Date.now()) => {
+    if (!isRunning || !lastTickAtRef.current) return;
+
+    const deltaMs = now - lastTickAtRef.current;
+    if (deltaMs <= 0) return;
+
+    lastTickAtRef.current = now;
+    const totalMs = leftoverMsRef.current + deltaMs;
+    const elapsedSeconds = Math.floor(totalMs / 1000);
+    leftoverMsRef.current = totalMs - (elapsedSeconds * 1000);
+
+    if (elapsedSeconds > 0) {
+      applyElapsedSeconds(elapsedSeconds);
+    }
+  }, [isRunning, applyElapsedSeconds]);
+
   const handleInteraction = useCallback((targetId, targetPos = null) => {
     if (selectedId === null) {
       if (targetId) setSelectedId(targetId);
@@ -167,6 +184,7 @@ function App() {
   useEffect(() => {
     if (!isRunning) {
       lastTickAtRef.current = null;
+      leftoverMsRef.current = 0;
       return;
     }
 
@@ -174,27 +192,18 @@ function App() {
       lastTickAtRef.current = Date.now();
     }
 
-    const syncElapsedTime = () => {
-      const now = Date.now();
-      const lastTickAt = lastTickAtRef.current || now;
-      const elapsedSeconds = Math.floor((now - lastTickAt) / 1000);
+    const handleSync = () => syncElapsedTime();
 
-      if (elapsedSeconds > 0) {
-        applyElapsedSeconds(elapsedSeconds);
-        lastTickAtRef.current = lastTickAt + (elapsedSeconds * 1000);
-      }
-    };
-
-    const interval = setInterval(syncElapsedTime, 1000);
-    document.addEventListener('visibilitychange', syncElapsedTime);
-    window.addEventListener('focus', syncElapsedTime);
+    const interval = setInterval(handleSync, 250);
+    document.addEventListener('visibilitychange', handleSync);
+    window.addEventListener('focus', handleSync);
 
     return () => {
       clearInterval(interval);
-      document.removeEventListener('visibilitychange', syncElapsedTime);
-      window.removeEventListener('focus', syncElapsedTime);
+      document.removeEventListener('visibilitychange', handleSync);
+      window.removeEventListener('focus', handleSync);
     };
-  }, [isRunning, applyElapsedSeconds]);
+  }, [isRunning, syncElapsedTime]);
 
   useEffect(() => {
     if (showConfetti) {
@@ -209,19 +218,16 @@ function App() {
     }
 
     if (isRunning) {
-      const now = Date.now();
-      const lastTickAt = lastTickAtRef.current || now;
-      const elapsedSeconds = Math.floor((now - lastTickAt) / 1000);
-      if (elapsedSeconds > 0) {
-        applyElapsedSeconds(elapsedSeconds);
-      }
+      syncElapsedTime();
       lastTickAtRef.current = null;
+      leftoverMsRef.current = 0;
     } else {
       lastTickAtRef.current = Date.now();
+      leftoverMsRef.current = 0;
     }
 
     setIsRunning((prev) => !prev);
-  }, [isRunning, timer, quarter, setPlayers, applyElapsedSeconds]);
+  }, [isRunning, timer, quarter, setPlayers, syncElapsedTime]);
 
   const registerGoal = (playerId) => {
     setScore((s) => ({ ...s, home: s.home + 1 }));
@@ -248,6 +254,7 @@ function App() {
   const performReset = useCallback(() => {
     setIsRunning(false);
     lastTickAtRef.current = null;
+    leftoverMsRef.current = 0;
     setScore({ home: 0, away: 0 });
     setTimer(0);
     setQuarter(1);
