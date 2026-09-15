@@ -67,3 +67,7 @@ Twee formaties met behoud van dezelfde zes spelers en ongewijzigde spelersminute
 ## Controles
 
 Modeltests controleren formatiewijzigingen, compatibiliteit met oude back-ups, pauze/hervatten/herladen, meerdere wissels, keeperminuten, herstel van goals/wissels, afgeronde wedstrijden, back-upvalidatie en snapshotexport. JavaScript en lokale assetverwijzingen worden apart gecontroleerd. Deze oplevering is niet in een echte mobiele browser getest; voer vóór de eerste echte wedstrijd een oefenwedstrijd uit, inclusief herladen en offline openen. De optionele WebMCP-leestool wordt alleen geregistreerd in browsers die hem ondersteunen; hiervoor was geen ondersteunde validatiecontext beschikbaar.
+
+## Versie 1.2.0
+
+Het veld blijft binnen de kaart op smalle schermen. Beide teams hebben een knop − Doelpunt: deze verwijdert alleen het laatste doelpunt van dat team en behoudt wissels en speeltijden. De stand kan ook direct na afronden worden gecorrigeerd; de bewaarde wedstrijd wordt bijgewerkt. Onder de score staat Samenvatting voor ouders, met een lokaal gemaakt, bewerkbaar bericht om zelf te kopiëren of delen.

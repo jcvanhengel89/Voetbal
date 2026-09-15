@@ -79,3 +79,20 @@ export function validateState(s) {
   for(const h of s.history){match(h.match,false);if(h.match.status!=='ended'||!Array.isArray(h.players)||h.players.some(p=>!p||!str(p.id)||!str(p.name)))fail();}
   return s;
 }
+
+// Remove only the latest goal for this side; later substitutions stay intact.
+export function removeGoal(m, side) {
+  if(!['us','them'].includes(side)||m.status==='ready')return false;
+  const index=m.events.findLastIndex(e=>e.type==='goal'&&e.side===side);
+  if(index<0)return false;
+  m.events.splice(index,1);return true;
+}
+export function matchSummary(m) {
+  const s=score(m), opponent=m.opponent||'de tegenstander';
+  const fixture=`Nieuwerkerk JO10-8 ${m.home?'thuis tegen':'uit bij'} ${opponent}`;
+  if(m.status==='ready')return `⚽ ${fixture}\n\nWe zijn klaar voor de wedstrijd! Kom je ons aanmoedigen? 💚`;
+  const result=m.status==='ended'
+    ? s.us>s.them?'Gewonnen! 🎉':s.us===s.them?'Een gelijkspel! 🤝':'Op naar de volgende wedstrijd! 💪'
+    :'Een update vanaf de zijlijn! 📣';
+  return `⚽ ${fixture}\n\n${m.status==='ended'?'Eindstand':'Tussenstand'}: ${s.us}–${s.them} (Nieuwerkerk eerst).\n${result}\n\n${m.status==='ended'?'Bedankt voor het aanmoedigen, ouders en supporters!':'Moedig je mee aan?'} 💚`;
+}
