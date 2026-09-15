@@ -60,7 +60,7 @@ Logische vervolgstap: geautoriseerde programmagegevens via een aparte adapter la
 
 `dist/model.js` bevat de wedstrijdlogica apart van `dist/app.js`. Het gegevensformaat heeft een versienummer en UUID's. Dat biedt een basis om later browseropslag te vervangen door een online opslaglaag, met accounts, teamrechten en conflictafhandeling. Die functies zijn nog niet geïmplementeerd.
 
-## Versie 1.1.0
+## Versie 1.1.1
 
 Twee formaties met behoud van dezelfde zes spelers en ongewijzigde spelersminuten; formatiewijzigingen tijdens een wedstrijd zijn herstelbaar. De opstelling en oude back-ups uit versie 1.0 blijven bruikbaar. De app gebruikt nog steeds opslagsleutel `zijlijn-v1`.
 
