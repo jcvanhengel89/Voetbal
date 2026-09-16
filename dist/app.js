@@ -1,6 +1,6 @@
 import {BLOCKS,nextTrainingDate,defaultStart,createTraining,schedule,trainingElapsed,startTraining,pauseTraining,nextBlock,trainingText} from './training.js';
 import {freshState,freshMatch,uid,elapsed,score,minutes,start,pause,setLineup,setFormation,positionNames,FORMATIONS,normalizeTeamUrl,undo,validateState,removeGoal,matchSummary,changeGame,undoGame,reminders,backupDue} from './model.js';
-const APP_VERSION='1.3.0';
+const APP_VERSION='1.3.1';
 const KEY='zijlijn-v1', $=s=>document.querySelector(s), app=$('#app'), dialog=$('#dialog');
 let state=freshState(), storageError='', tab=location.hash.slice(1)||'wedstrijd', toastTimer, wakeLock;
 let swRegistration, waitingWorker, updateCheck='Nog niet gecontroleerd', latestVersion='', lastUpdateCheck=0, checkingUpdate=false;
@@ -88,17 +88,21 @@ let offlineReady=false;
 function versionContent(){return `<p>Je gebruikt <strong>Zijlijn ${APP_VERSION}</strong>.</p><p class="muted small" id="update-status" role="status">${esc(updateCheck)}</p><div class="stack"><button data-action="check-update">Controleer op updates</button>${waitingWorker?'<button class="primary" data-action="apply-update">Update laden</button>':''}</div><p class="hint">Je spelers en wedstrijden blijven bewaard bij een update.</p>`;}
 function showVersion(){modal('Versie & updates',versionContent());checkForUpdate();}
 function refreshVersion(){const badge=$('#app-version');if(badge){badge.textContent=`v${APP_VERSION}${waitingWorker?' · Update':''}`;badge.setAttribute('aria-label',`Zijlijn versie ${APP_VERSION}. ${waitingWorker?'Update beschikbaar. ':''}Versie en updates bekijken`);}if(dialog.open&&$('#update-status'))modal('Versie & updates',versionContent());}
-function observeRegistration(reg){swRegistration=reg;const found=()=>{if(reg.waiting){waitingWorker=reg.waiting;updateCheck='Er staat een update klaar. Tik op Update laden.';refreshVersion();}};found();reg.addEventListener('updatefound',()=>{const worker=reg.installing;worker?.addEventListener('statechange',()=>{if(worker.state==='installed')found();});});}
+function observeRegistration(reg){swRegistration=reg;const found=()=>{if(reg.waiting){waitingWorker=reg.waiting;updateCheck='Er staat een update klaar. Tik op Update laden.';refreshVersion();}};found();reg.addEventListener('updatefound',()=>{const worker=reg.installing;worker?.addEventListener('statechange',()=>{if(worker.state==='installed'&&(reg.waiting||navigator.serviceWorker.controller)){waitingWorker=reg.waiting||worker;updateCheck='Er staat een update klaar. Tik op Update laden.';refreshVersion();}});});}
 async function checkForUpdate(force=false){
  if(checkingUpdate||(!force&&Date.now()-lastUpdateCheck<60000))return;
  checkingUpdate=true;lastUpdateCheck=Date.now();
  try{
   if(!navigator.onLine)throw Error('offline');
-  if(swRegistration)await swRegistration.update();
   const response=await fetch(`./release.json?t=${Date.now()}`,{cache:'no-store'});
   if(!response.ok)throw Error('release');
   const release=await response.json();if(!/^\d+\.\d+\.\d+$/.test(release.version))throw Error('release');
   latestVersion=release.version;
+  if(swRegistration){
+   if(latestVersion!==APP_VERSION){const reg=await navigator.serviceWorker.register(`./sw.js?v=${encodeURIComponent(latestVersion)}`,{updateViaCache:'none'});observeRegistration(reg);}
+   else await swRegistration.update();
+   if(swRegistration.waiting){waitingWorker=swRegistration.waiting;}
+  }
   updateCheck=waitingWorker?'Er staat een update klaar. Tik op Update laden.':latestVersion===APP_VERSION?`Nieuwste versie bevestigd om ${new Date().toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})}.`:`Versie ${latestVersion} is beschikbaar. De update wordt voorbereid; controleer zo nog eens.`;
  }catch{updateCheck=navigator.onLine?'De nieuwste versie kon niet worden gecontroleerd. Probeer het later opnieuw.':'Je bent offline. Controleer de nieuwste versie zodra je internet hebt.';}
  finally{checkingUpdate=false;refreshVersion();}

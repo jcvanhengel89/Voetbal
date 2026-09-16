@@ -9,12 +9,12 @@ test('versiecontrole passeert offline-cache, assets gebruiken eigen releasecache
  let response;
  handlers.fetch({request:{method:'GET',url:'https://example.test/Voetbal/release.json?t=123'},respondWith:()=>assert.fail('Release mag niet uit de offline-cache komen')});
  handlers.fetch({request:{method:'GET',url:'https://example.test/Voetbal/app.js'},respondWith:p=>response=p});
- assert.equal(await response,'cached asset');assert.deepEqual(calls,['zijlijn-v1.3.0']);
+ assert.equal(await response,'cached asset');assert.deepEqual(calls,['zijlijn-v1.3.1']);
 });
 test('een nieuwe worker activeert alleen op verzoek, niet tijdens installatie',async()=>{
- const handlers={};let activations=0;
- vm.runInNewContext(code,{URL,self:{addEventListener:(t,f)=>handlers[t]=f,skipWaiting:()=>{activations++;return Promise.resolve();}},caches:{open:async()=>({addAll:async()=>{}})}});
+ const handlers={};let activations=0;const requests=[];
+ vm.runInNewContext(code,{URL,Request:class{constructor(path,options){this.path=path;this.cache=options.cache;}},self:{addEventListener:(t,f)=>handlers[t]=f,skipWaiting:()=>{activations++;return Promise.resolve();}},caches:{open:async()=>({addAll:async assets=>requests.push(...assets)})}});
  let completion;
- handlers.install({waitUntil:p=>completion=p});await completion;assert.equal(activations,0);
+ handlers.install({waitUntil:p=>completion=p});await completion;assert.equal(activations,0);assert.ok(requests.some(r=>r.path==='./training.js'));assert.ok(requests.every(r=>r.cache==='reload'));
  handlers.message({data:{type:'ACTIVATE_UPDATE'},waitUntil:p=>completion=p});await completion;assert.equal(activations,1);
 });

@@ -91,3 +91,7 @@ Het veld blijft binnen de kaart op smalle schermen. Beide teams hebben een knop 
 Trainingsschema's en notities werken lokaal/offline en gaan mee in een back-up; de Rinus-pagina's en video's worden niet gekopieerd en hebben internet nodig. Rinus-links worden op domein en oefenpad gecontroleerd, maar de app haalt geen titel of instructies op en controleert niet of de oefening nog bestaat.
 
 Bestaande opslag en versie-1-back-ups worden aangevuld met defaults. Een teruggezette back-up pauzeert alle timers en wist de tijdelijke herstelgeschiedenis. Er worden geen gegevens naar een server gesynchroniseerd.
+
+### Versie 1.3.1
+
+Offline-updates halen alle appbestanden opnieuw op met cache-revalidatie. Bij een afwijkend gepubliceerd versienummer registreert de app de worker met dat versienummer in de URL en herkent hij de geïnstalleerde update direct. Dit voorkomt hergebruik van oude appbestanden tijdens een release.
