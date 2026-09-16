@@ -8,8 +8,8 @@ Een minimalistische webapp voor de teammanager langs de lijn. Geen account, serv
 2. Vul tegenstander, aftraptijd, thuis/uit en minuten per helft in.
 3. Tik bij **Opstelling** op de zes posities en kies je spelers. Kies boven het veld tussen 1–2–2–1 en 1–2–1–2, inclusief keeper. Positienamen staan op het veld en in beide keuzerichtingen. In de spelerskeuze staan bankspelers bovenaan; al opgestelde spelers staan grijs onderaan met hun positie erbij. De begininstelling is twee helften van 25 minuten; pas die aan als jullie anders spelen.
 4. Tik op **Aftrap**. Registreer goals met de grote knoppen. Tik op een veldpositie of bankspeler voor een wissel. Twee veldspelers kunnen van positie ruilen.
-5. Gebruik **Pauze** bij time-outs en rust. **2e helft** pauzeert de klok en wijzigt het helftnummer. Tik bij de hervatting op **Hervatten**. De klok toont altijd de totale gespeelde tijd en stopt niet automatisch bij de richttijd.
-6. **Laatste actie herstellen** verwijdert de laatste goal, wissel of formatiewijziging. Een herstelde wissel corrigeert ook de speeltijd vanaf dat wisselmoment.
+5. Gebruik **Pauze** bij time-outs en rust. **2e helft** pauzeert de klok en wijzigt het helftnummer. Tik bij de hervatting op **Hervatten**. De grote klok toont de tijd in deze helft, met de totale gespeelde tijd eronder en stopt niet automatisch bij de richttijd.
+6. **Herstel: [actie]** zet de laatste wijziging terug, inclusief een verwijderd doelpunt, wissel, opstelling, formatie of helftwissel. De laatste twintig acties worden lokaal bewaard; aftrap, afronden en een nieuwe wedstrijd beginnen met een lege herstelgeschiedenis. Herstellen verandert de lopende klok niet. Een herstelde wissel corrigeert ook de speeltijd vanaf dat wisselmoment.
 7. **Wedstrijd afronden** stopt de klok en bewaart een momentopname. Daarna kun je een nieuwe wedstrijd beginnen.
 8. Bewaar regelmatig een JSON-back-up via **Mijn team**. Die is ook geschikt voor overzetten naar een ander toestel. Een teruggezette wedstrijd staat gepauzeerd op het moment van de export.
 
@@ -24,7 +24,7 @@ Open de gehoste website eerst met internet. Wacht tot **Offline beschikbaar** on
 - Gebruik één tabblad tijdens de wedstrijd. Wijzigingen worden tussen tabbladen doorgegeven, maar gelijktijdig invoeren is niet ondersteund.
 - Als je de app sluit terwijl de klok loopt, telt die bij heropenen door. Het scherm blijft waar ondersteund wakker. Bij een vergrendeld toestel wordt geen alarm gegarandeerd.
 - Browseropslag is geen cloudback-up. Wissen van websitegegevens of wisselen van browser kan gegevens verwijderen. De app meldt opslagproblemen en biedt back-updownload. Het oorspronkelijke herstelbestand is te downloaden als bestaande opslag niet gelezen kan worden.
-- Tik bovenaan op **v1.1.0** om de huidige versie te bekijken en op updates te controleren. Zodra een nieuwe offlineversie klaarstaat, verschijnt **Update laden**. Deze laadt de app opnieuw met behoud van lokale gegevens. Vanuit de oude versie zonder updateknop: open de app online, sluit alle tabbladen en de beginscherm-app, en open opnieuw. Verhoog bij een release het versienummer in `package.json`, `dist/app.js`, `dist/index.html`, `dist/release.json` en de cachenaam in `dist/sw.js`. De versiecontrole haalt alleen het openbare versienummer op; er worden geen spelers- of wedstrijdgegevens verzonden.
+- Tik bovenaan op het **versienummer** om de huidige versie te bekijken en op updates te controleren. Zodra een nieuwe offlineversie klaarstaat, verschijnt **Update laden**. Deze laadt de app opnieuw met behoud van lokale gegevens. Vanuit de oude versie zonder updateknop: open de app online, sluit alle tabbladen en de beginscherm-app, en open opnieuw. Verhoog bij een release het versienummer in `package.json`, `dist/app.js`, `dist/index.html`, `dist/release.json` en de cachenaam in `dist/sw.js`. De versiecontrole haalt alleen het openbare versienummer op; er worden geen spelers- of wedstrijdgegevens verzonden.
 
 ## GitHub Pages
 
@@ -71,3 +71,23 @@ Modeltests controleren formatiewijzigingen, compatibiliteit met oude back-ups, p
 ## Versie 1.2.0
 
 Het veld blijft binnen de kaart op smalle schermen. Beide teams hebben een knop − Doelpunt: deze verwijdert alleen het laatste doelpunt van dat team en behoudt wissels en speeltijden. De stand kan ook direct na afronden worden gecorrigeerd; de bewaarde wedstrijd wordt bijgewerkt. Onder de score staat Samenvatting voor ouders, met een lokaal gemaakt, bewerkbaar bericht om zelf te kopiëren of delen.
+
+## Versie 1.3.0 — training en verbeteringen langs de lijn
+
+- Compact scorebord met wisselbank direct eronder; bankspelers gesorteerd op minste gespeelde tijd. De keuzelijst toont ook speeltijden.
+- Instelbare wisselherinnering bij Mijn team. Een time-outherinnering verschijnt halverwege iedere helft. Herinneringen verschijnen alleen in de geopende app; geen achtergrondmeldingen.
+- Notities en bewerkte samenvattingen worden automatisch bewaard. Na een scorewijziging kun je de samenvatting opnieuw laten maken (met bevestiging).
+- Tik bij Mijn team op een vorige wedstrijd voor eindopstelling, speeltijd, gebeurtenissen en samenvatting.
+- Een back-upherinnering volgt na de eerste afgeronde wedstrijd zonder export, drie wedstrijden sinds de laatste export, of zeven dagen na de laatste export. De datum is het moment waarop de download werd aangeboden; de browser kan niet bevestigen dat het bestand daadwerkelijk is bewaard.
+
+### Training
+
+1. Open Training → Nieuwe training. De eerstvolgende woensdag of vrijdag staat ingevuld.
+2. Vul Rinus-oefenlinks in voor warming-up en twee oefeningen. Een vierde link voor partijen is optioneel.
+3. Het schema gebruikt 10 + 15 + 15 + 30 minuten, totaal 70 minuten. Woensdag begint standaard om 17.30 en vrijdag om 17.45, beide veld 5. Deze defaults komen uit de JO10-3 t/m JO10-8-rijen in het aangeleverde trainingsschema; enkele paginakoppen van dat bestand noemen nog 2025–2026. De gebruiker kan datum, begintijd en veld aanpassen.
+4. Bewaar het schema. Start de training en open de instructies met Open oefening in Rinus. De timer loopt door bij het openen van een ander tabblad of herladen. Pauze zet hem stil; Volgende start het volgende onderdeel (of houdt het gepauzeerd als het vorige gepauzeerd was). De app wisselt nooit automatisch van oefening.
+5. Deel het tijdschema, voeg notities/materialen toe of hergebruik de training op een andere datum. Er kan één training tegelijk actief zijn.
+
+Trainingsschema's en notities werken lokaal/offline en gaan mee in een back-up; de Rinus-pagina's en video's worden niet gekopieerd en hebben internet nodig. Rinus-links worden op domein en oefenpad gecontroleerd, maar de app haalt geen titel of instructies op en controleert niet of de oefening nog bestaat.
+
+Bestaande opslag en versie-1-back-ups worden aangevuld met defaults. Een teruggezette back-up pauzeert alle timers en wist de tijdelijke herstelgeschiedenis. Er worden geen gegevens naar een server gesynchroniseerd.

@@ -1,3 +1,4 @@
+import {validateTraining} from './training.js';
 export const VERSION = 1;
 export const FORMATIONS = {
   '1-2-2-1':['Keeper','Linksachter','Rechtsachter','Linksmidden','Rechtsmidden','Spits'],
@@ -12,8 +13,8 @@ export function normalizeTeamUrl(value) {
   return url.href;
 }
 export const uid = () => globalThis.crypto.randomUUID();
-export function freshMatch() { return { id:uid(), opponent:'', date:'', home:true, halfMinutes:25, half:1, elapsed:0, startedAt:null, status:'ready', formation:'1-2-2-1', initialFormation:'1-2-2-1', lineup:Array(6).fill(null), initialLineup:Array(6).fill(null), events:[] }; }
-export function freshState() { return {version:VERSION, teamUrl:'', players:[], match:freshMatch(), history:[]}; }
+export function freshMatch() { return { id:uid(), opponent:'', date:'', home:true, halfMinutes:25, half:1, elapsed:0, startedAt:null, status:'ready', halfStartedAt:0, timeouts:[], swapSnoozeAt:0, summary:'', summarySaved:false, notes:'', formation:'1-2-2-1', initialFormation:'1-2-2-1', lineup:Array(6).fill(null), initialLineup:Array(6).fill(null), events:[] }; }
+export function freshState() { return {version:VERSION, teamUrl:'', players:[], match:freshMatch(), history:[], undoHistory:[], trainings:[], selectedTrainingId:'', swapInterval:0, backupAt:0, backupMatches:0}; }
 export function elapsed(m, now=Date.now()) { return m.elapsed + (m.startedAt === null ? 0 : Math.max(0,now-m.startedAt)); }
 export function score(m) { return m.events.reduce((s,e)=>{if(e.type==='goal') s[e.side]++; return s;},{us:0,them:0}); }
 export function minutes(m, now=Date.now()) {
@@ -61,6 +62,9 @@ export function validateState(s) {
   const line=(l,known)=>Array.isArray(l)&&l.length===6&&l.every(v=>v===null||(str(v)&&(!known||ids.has(v))))&&new Set(l.filter(Boolean)).size===l.filter(Boolean).length;
   function match(m,known) {
     if(!m||!str(m.id)||!str(m.opponent)||!str(m.date)||typeof m.home!=='boolean'||!Number.isInteger(m.halfMinutes)||m.halfMinutes<1||m.halfMinutes>60||![1,2].includes(m.half)||!num(m.elapsed)||!(m.startedAt===null||num(m.startedAt))||!['ready','live','ended'].includes(m.status)||!line(m.lineup,known)||!line(m.initialLineup,known)||!Array.isArray(m.events)||m.events.length>10000)fail();
+    m.halfStartedAt??=m.half===2?Math.min(m.elapsed,m.halfMinutes*60000):0;
+    m.timeouts??=[];m.swapSnoozeAt??=0;m.summary??='';m.summarySaved??=!!m.summary;m.notes??='';
+    if(!num(m.halfStartedAt)||m.halfStartedAt>elapsed(m)+1000||!num(m.swapSnoozeAt)||!Array.isArray(m.timeouts)||m.timeouts.length>2||m.timeouts.some(v=>![1,2].includes(v))||typeof m.summarySaved!=='boolean'||typeof m.summary!=='string'||m.summary.length>10000||typeof m.notes!=='string'||m.notes.length>10000)fail();
     if(m.formation===undefined)m.formation='1-2-2-1';
     if(m.initialFormation===undefined)m.initialFormation='1-2-2-1';
     if(!Object.hasOwn(FORMATIONS,m.formation)||!Object.hasOwn(FORMATIONS,m.initialFormation))fail();
@@ -76,6 +80,12 @@ export function validateState(s) {
     if(m.status!=='live'&&m.startedAt!==null)fail();
   }
   match(s.match,true);
+  s.undoHistory??=[];s.trainings??=[];s.selectedTrainingId??='';s.swapInterval??=0;s.backupAt??=0;s.backupMatches??=0;
+  if(!Array.isArray(s.undoHistory)||s.undoHistory.length>20||!Array.isArray(s.trainings)||s.trainings.length>500||!str(s.selectedTrainingId)||!Number.isInteger(s.swapInterval)||s.swapInterval<0||s.swapInterval>60||!num(s.backupAt)||!Number.isInteger(s.backupMatches)||s.backupMatches<0)fail();
+  for(const u of s.undoHistory){if(!u||!str(u.label)||!u.before)fail();match({...s.match,...u.before},true);}
+  const trainingIds=new Set();for(const t of s.trainings){validateTraining(t);if(trainingIds.has(t.id))fail();trainingIds.add(t.id);}
+  if(s.trainings.filter(t=>t.run.status==='live').length>1)fail();
+  if(s.selectedTrainingId&&!trainingIds.has(s.selectedTrainingId))s.selectedTrainingId='';
   for(const h of s.history){match(h.match,false);if(h.match.status!=='ended'||!Array.isArray(h.players)||h.players.some(p=>!p||!str(p.id)||!str(p.name)))fail();}
   return s;
 }
@@ -95,4 +105,25 @@ export function matchSummary(m) {
     ? s.us>s.them?'Gewonnen! 🎉':s.us===s.them?'Een gelijkspel! 🤝':'Op naar de volgende wedstrijd! 💪'
     :'Een update vanaf de zijlijn! 📣';
   return `⚽ ${fixture}\n\n${m.status==='ended'?'Eindstand':'Tussenstand'}: ${s.us}–${s.them} (Nieuwerkerk eerst).\n${result}\n\n${m.status==='ended'?'Bedankt voor het aanmoedigen, ouders en supporters!':'Moedig je mee aan?'} 💚`;
+}
+
+const GAME_KEYS=['lineup','initialLineup','formation','initialFormation','events','half','halfStartedAt','timeouts','swapSnoozeAt'];
+export function changeGame(s,label,change){
+ const before=Object.fromEntries(GAME_KEYS.map(k=>[k,structuredClone(s.match[k])]));
+ change(s.match);
+ if(GAME_KEYS.some(k=>JSON.stringify(before[k])!==JSON.stringify(s.match[k]))){s.undoHistory.push({label,before});s.undoHistory=s.undoHistory.slice(-20);}
+}
+export function undoGame(s){
+ const u=s.undoHistory.pop();if(!u)return false;
+ for(const k of GAME_KEYS)if(Object.hasOwn(u.before,k))s.match[k]=structuredClone(u.before[k]);
+ return u.label;
+}
+export function reminders(s,now=Date.now()){
+ const m=s.match,t=elapsed(m,now),half=t-m.halfStartedAt;
+ const lastSwap=m.events.filter(e=>e.type==='lineup').at(-1)?.at||0;
+ return {timeout:m.status==='live'&&!m.timeouts.includes(m.half)&&half>=m.halfMinutes*30000,
+ swap:m.status==='live'&&s.swapInterval>0&&s.players.some(p=>p.present&&!m.lineup.includes(p.id))&&t-Math.max(lastSwap,m.swapSnoozeAt)>=s.swapInterval*60000};
+}
+export function backupDue(s,now=Date.now()){
+ return s.history.length-s.backupMatches>=3||(!s.backupAt&&s.history.length>0)||(s.backupAt>0&&now-s.backupAt>=7*86400000);
 }
