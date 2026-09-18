@@ -1,6 +1,6 @@
 import {BLOCKS,nextTrainingDate,defaultStart,createTraining,schedule,trainingElapsed,startTraining,pauseTraining,nextBlock,trainingText} from './training.js';
 import {freshState,freshMatch,uid,elapsed,score,minutes,start,pause,setLineup,setFormation,positionNames,FORMATIONS,normalizeTeamUrl,undo,validateState,removeGoal,matchSummary,changeGame,undoGame,reminders,backupDue} from './model.js';
-const APP_VERSION='1.3.1';
+const APP_VERSION='1.3.2';
 const KEY='zijlijn-v1', $=s=>document.querySelector(s), app=$('#app'), dialog=$('#dialog');
 let state=freshState(), storageError='', tab=location.hash.slice(1)||'wedstrijd', toastTimer, wakeLock;
 let swRegistration, waitingWorker, updateCheck='Nog niet gecontroleerd', latestVersion='', lastUpdateCheck=0, checkingUpdate=false;
@@ -12,7 +12,7 @@ const clock=ms=>`${Math.floor(ms/60000).toString().padStart(2,'0')}:${Math.floor
 const present=()=>state.players.filter(p=>p.present);
 const bench=()=>{const t=minutes(state.match);return present().filter(p=>!state.match.lineup.includes(p.id)).sort((a,b)=>(t[a.id]||0)-(t[b.id]||0)||a.name.localeCompare(b.name,'nl'));};
 const dateLabel=m=>m.date?new Date(m.date).toLocaleString('nl-NL',{weekday:'short',day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Nog geen aftraptijd';
-function toast(s){$('#toast').textContent=s;$('#toast').style.display='block';clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').style.display='none',4000);}
+function toast(s){$('#toast').textContent=storageError||s;$('#toast').style.display='block';clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').style.display='none',4000);}
 function save(){if(storageError)return;try{localStorage.setItem(KEY,JSON.stringify(state));}catch{storageError='Opslaan lukt niet. Je gegevens staan nu alleen in dit scherm. Maak een back-up via Mijn team.';toast(storageError);}}
 function update(){save();render();}
 function modal(title,html){$('#dialog-content').innerHTML=`<div class="dialog-head"><h2>${title}</h2><button class="close" data-action="close" aria-label="Sluiten">×</button></div>${html}`;if(!dialog.open)dialog.showModal();}
@@ -89,6 +89,7 @@ function versionContent(){return `<p>Je gebruikt <strong>Zijlijn ${APP_VERSION}<
 function showVersion(){modal('Versie & updates',versionContent());checkForUpdate();}
 function refreshVersion(){const badge=$('#app-version');if(badge){badge.textContent=`v${APP_VERSION}${waitingWorker?' · Update':''}`;badge.setAttribute('aria-label',`Zijlijn versie ${APP_VERSION}. ${waitingWorker?'Update beschikbaar. ':''}Versie en updates bekijken`);}if(dialog.open&&$('#update-status'))modal('Versie & updates',versionContent());}
 function observeRegistration(reg){swRegistration=reg;const found=()=>{if(reg.waiting){waitingWorker=reg.waiting;updateCheck='Er staat een update klaar. Tik op Update laden.';refreshVersion();}};found();reg.addEventListener('updatefound',()=>{const worker=reg.installing;worker?.addEventListener('statechange',()=>{if(worker.state==='installed'&&(reg.waiting||navigator.serviceWorker.controller)){waitingWorker=reg.waiting||worker;updateCheck='Er staat een update klaar. Tik op Update laden.';refreshVersion();}});});}
+const workerUrl=version=>`./sw.js?v=${encodeURIComponent(version)}`;
 async function checkForUpdate(force=false){
  if(checkingUpdate||(!force&&Date.now()-lastUpdateCheck<60000))return;
  checkingUpdate=true;lastUpdateCheck=Date.now();
@@ -99,7 +100,7 @@ async function checkForUpdate(force=false){
   const release=await response.json();if(!/^\d+\.\d+\.\d+$/.test(release.version))throw Error('release');
   latestVersion=release.version;
   if(swRegistration){
-   if(latestVersion!==APP_VERSION){const reg=await navigator.serviceWorker.register(`./sw.js?v=${encodeURIComponent(latestVersion)}`,{updateViaCache:'none'});observeRegistration(reg);}
+   if(latestVersion!==APP_VERSION){const reg=await navigator.serviceWorker.register(workerUrl(latestVersion),{updateViaCache:'none'});observeRegistration(reg);}
    else await swRegistration.update();
    if(swRegistration.waiting){waitingWorker=swRegistration.waiting;}
   }
@@ -115,7 +116,7 @@ function applyUpdate(){
 if('serviceWorker' in navigator){
  let controlled=!!navigator.serviceWorker.controller;
  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(controlled)location.reload();else controlled=true;});
- navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(reg=>{observeRegistration(reg);return navigator.serviceWorker.ready;}).then(()=>{offlineReady=true;tick();checkForUpdate();}).catch(()=>{});
+ navigator.serviceWorker.register(workerUrl(APP_VERSION),{updateViaCache:'none'}).then(reg=>{observeRegistration(reg);return navigator.serviceWorker.ready;}).then(()=>{offlineReady=true;tick();checkForUpdate();}).catch(()=>{});
 }
 refreshVersion();checkForUpdate();
 const modelContext=document.modelContext;
@@ -137,7 +138,6 @@ function summaryMatch(){return summaryTargetId===state.match.id?state.match:stat
 function showSummary(b){
  summaryTargetId=b?.dataset.id||state.match.id;const m=summaryMatch();if(!m)return;
  const text=m.summarySaved?m.summary:composeSummary(m);
- if(!m.summarySaved){m.summary=text;m.summarySaved=true;syncHistory();save();}
  modal('Samenvatting voor ouders',`<p class="muted small">Je wijzigingen worden automatisch bewaard.</p><label class="stack" for="summary-text">Jouw bericht<textarea id="summary-text" maxlength="10000" rows="10">${esc(text)}</textarea></label><div class="row"><button class="primary" data-action="copy-summary">Kopiëren</button>${navigator.share?'<button data-action="share-summary">Delen…</button>':''}</div><button class="text-button" data-action="regenerate-summary">Opnieuw maken met de huidige stand</button><p class="hint">Je kiest zelf waar en met wie je het bericht deelt. Na een scorecorrectie kun je het bericht opnieuw maken.</p>`);
 }
 async function copySummary(){
@@ -175,7 +175,7 @@ Object.assign(actions,{
  'timeout':()=>{pause(state.match);changeGame(state,'time-out',m=>{m.timeouts=[...new Set([...m.timeouts,m.half])];});keepAwake();update();toast('Klok gepauzeerd. Tik op Hervatten bij de aftrap.');},
  'snooze-swap':()=>{state.match.swapSnoozeAt=elapsed(state.match);update();},
  'regenerate-summary':()=>confirmAction('Bericht opnieuw maken','Dit vervangt jouw bewerkte tekst door een nieuw bericht met de huidige stand en notities.','confirm-summary','Opnieuw maken'),
- 'confirm-summary':()=>{const m=summaryMatch();if(!m)return;m.summary=composeSummary(m);m.summarySaved=true;syncHistory();save();showSummary({dataset:{id:m.id}});}
+ 'confirm-summary':()=>{const m=summaryMatch();if(!m)return;m.summary='';m.summarySaved=false;syncHistory();save();showSummary({dataset:{id:m.id}});}
 });
 document.addEventListener('input',e=>{
  if(e.target.id==='summary-text'){const m=summaryMatch();if(m){m.summary=e.target.value;m.summarySaved=true;syncHistory();save();}}

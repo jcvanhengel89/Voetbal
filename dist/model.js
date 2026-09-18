@@ -15,7 +15,11 @@ export function normalizeTeamUrl(value) {
 export const uid = () => globalThis.crypto.randomUUID();
 export function freshMatch() { return { id:uid(), opponent:'', date:'', home:true, halfMinutes:25, half:1, elapsed:0, startedAt:null, status:'ready', halfStartedAt:0, timeouts:[], swapSnoozeAt:0, summary:'', summarySaved:false, notes:'', formation:'1-2-2-1', initialFormation:'1-2-2-1', lineup:Array(6).fill(null), initialLineup:Array(6).fill(null), events:[] }; }
 export function freshState() { return {version:VERSION, teamUrl:'', players:[], match:freshMatch(), history:[], undoHistory:[], trainings:[], selectedTrainingId:'', swapInterval:0, backupAt:0, backupMatches:0}; }
-export function elapsed(m, now=Date.now()) { return m.elapsed + (m.startedAt === null ? 0 : Math.max(0,now-m.startedAt)); }
+export function elapsed(m, now=Date.now()) {
+  const current=m.elapsed+(m.startedAt===null?0:Math.max(0,now-m.startedAt));
+  if(m.status!=='live'||m.startedAt===null)return current;
+  return Math.max(current,m.halfStartedAt||0,m.events.at(-1)?.at||0);
+}
 export function score(m) { return m.events.reduce((s,e)=>{if(e.type==='goal') s[e.side]++; return s;},{us:0,them:0}); }
 export function minutes(m, now=Date.now()) {
   const total=elapsed(m,now), result={}; let previous=0, lineup=m.initialLineup;
@@ -120,7 +124,9 @@ export function undoGame(s){
 }
 export function reminders(s,now=Date.now()){
  const m=s.match,t=elapsed(m,now),half=t-m.halfStartedAt;
- const lastSwap=m.events.filter(e=>e.type==='lineup').at(-1)?.at||0;
+ const lastSwap=m.events.filter(e=>e.type==='lineup'&&(
+  e.before.some(id=>id&&!e.lineup.includes(id))||e.lineup.some(id=>id&&!e.before.includes(id))
+ )).at(-1)?.at||0;
  return {timeout:m.status==='live'&&!m.timeouts.includes(m.half)&&half>=m.halfMinutes*30000,
  swap:m.status==='live'&&s.swapInterval>0&&s.players.some(p=>p.present&&!m.lineup.includes(p.id))&&t-Math.max(lastSwap,m.swapSnoozeAt)>=s.swapInterval*60000};
 }

@@ -22,6 +22,14 @@ test('time-out per helft en wisselherinnering volgen werkelijk gespeelde tijd',(
  assert.equal(reminders(s,2749999).timeout,false);assert.equal(reminders(s,2750000).timeout,true);
  s.match.status='ended';pause(s.match,2750000);assert.deepEqual(reminders(s,3000000),{timeout:false,swap:false});
 });
+test('positieruil reset wisselherinnering niet maar echte bankwissel wel',()=>{
+ const s=setup();s.swapInterval=5;
+ setLineup(s.match,['b','a','c','d','e','f'],240000);
+ assert.equal(reminders(s,300000).swap,true);
+ setLineup(s.match,['g','a','c','d','e','f'],310000);
+ assert.equal(reminders(s,609999).swap,false);
+ assert.equal(reminders(s,610000).swap,true);
+});
 test('oude back-ups krijgen veilige defaults, notities en archief blijven behouden',()=>{
  const s=setup();pause(s.match,10000);s.match.status='ended';s.history.push({match:structuredClone(s.match),players:structuredClone(s.players)});
  for(const key of ['undoHistory','trainings','selectedTrainingId','swapInterval','backupAt','backupMatches'])delete s[key];

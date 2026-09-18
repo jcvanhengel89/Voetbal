@@ -3,6 +3,26 @@ import assert from 'node:assert/strict';
 import {freshState,freshMatch,start,pause,elapsed,minutes,setLineup,setFormation,positionNames,normalizeTeamUrl,score,undo,validateState} from '../dist/model.js';
 const setup=()=>{const m=freshMatch();setLineup(m,['a','b','c','d','e','f'],0);return m;};
 test('klok blijft juist bij pauze, herladen en hervatten',()=>{const m=setup();start(m,1000);assert.equal(elapsed(m,61000),60000);const restored=JSON.parse(JSON.stringify(m));assert.equal(elapsed(restored,91000),90000);pause(m,121000);assert.equal(elapsed(m,600000),120000);start(m,600000);assert.equal(elapsed(m,660000),180000);});
+test('lopende klok gaat bij teruggezette systeemtijd niet voorbij vastgelegde acties terug',()=>{
+ const began=Date.now()+60000,s=freshState();s.players='abcdefg'.split('').map(id=>({id,name:id,present:true}));s.match=setup();start(s.match,began);
+ setLineup(s.match,['g','b','c','d','e','f'],began+5000);
+ assert.equal(elapsed(s.match,began-1000),5000);
+ assert.deepEqual(validateState(structuredClone(s)),s);
+ setFormation(s.match,'1-2-1-2',began-1000);
+ assert.equal(s.match.events.at(-1).at,5000);
+ pause(s.match,began-2000);
+ assert.equal(s.match.elapsed,5000);
+ assert.deepEqual(validateState(structuredClone(s)),s);
+ const half=setup();half.status='live';half.elapsed=3000;half.half=2;half.halfStartedAt=4000;half.startedAt=began;
+ assert.equal(elapsed(half,began-1000),4000);
+});
+test('validatie weigert acties voorbij de klok van stilgezette wedstrijden',()=>{
+ for(const status of ['live','ended']){
+  const s=freshState();s.players='abcdef'.split('').map(id=>({id,name:id,present:true}));s.match=setup();start(s.match,0);pause(s.match,1000);s.match.status=status;
+  s.match.events.push({id:'te-laat',type:'goal',side:'us',at:3000});
+  assert.throws(()=>validateState(s));
+ }
+});
 test('wissels verdelen speeltijd en keeper telt mee',()=>{const m=setup();start(m,0);setLineup(m,['g','b','c','d','e','f'],600000);pause(m,1200000);const t=minutes(m,9999999);assert.equal(t.a,600000);assert.equal(t.g,600000);assert.equal(t.b,1200000);assert.equal(Object.values(t).reduce((a,b)=>a+b),6*1200000);});
 test('herstellen van een wissel corrigeert minuten vanaf het wisselmoment',()=>{const m=setup();start(m,0);setLineup(m,['g','b','c','d','e','f'],600000);assert.equal(minutes(m,900000).g,300000);undo(m);assert.deepEqual(m.lineup,m.initialLineup);assert.equal(minutes(m,900000).a,900000);assert.equal(minutes(m,900000).g,undefined);});
 test('meerdere wissels en positie wisselen behouden totale spelersminuten',()=>{const m=setup();start(m,0);setLineup(m,['a','g','c','d','e','f'],100000);setLineup(m,['g','a','c','d','e','f'],200000);pause(m,300000);assert.deepEqual(minutes(m),{a:300000,b:100000,c:300000,d:300000,e:300000,f:300000,g:200000});});

@@ -95,3 +95,11 @@ Bestaande opslag en versie-1-back-ups worden aangevuld met defaults. Een terugge
 ### Versie 1.3.1
 
 Offline-updates halen alle appbestanden opnieuw op met cache-revalidatie. Bij een afwijkend gepubliceerd versienummer registreert de app de worker met dat versienummer in de URL en herkent hij de geïnstalleerde update direct. Dit voorkomt hergebruik van oude appbestanden tijdens een release.
+
+### Versie 1.3.2 — controle voor de eerste wedstrijd
+
+- Alleen bekijken van een samenvatting bewaart geen oude tussenstand meer. Een automatisch bericht volgt bij heropenen de score en het einde van de wedstrijd. Handmatig bewerkte tekst blijft bewaard; Opnieuw maken herstelt het automatische bericht.
+- Een positieruil tussen veldspelers stelt de wisselherinnering niet uit; een echte bankwissel wel.
+- De updatecontrole gebruikt bij opstarten en bijwerken dezelfde worker-URL, zodat een reeds geladen versie geen extra update veroorzaakt.
+- Een opslagfout blijft zichtbaar en wordt niet overschreven door een succesbericht.
+- Als de systeemklok terug wordt gezet, blijft de lopende wedstrijd ten minste op het laatste vastgelegde actie- of rustmoment. Dat voorkomt dat eigen wedstrijdgegevens bij herladen als ongeldig worden geweigerd. De klok kan in dit uitzonderlijke geval tijdelijk blijven staan; voorwaartse systeemtijdsprongen worden niet gecorrigeerd.

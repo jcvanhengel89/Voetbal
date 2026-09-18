@@ -6,10 +6,10 @@ import * as model from '../dist/model.js';
 import * as training from '../dist/training.js';
 const code=readFileSync(new URL('../dist/app.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
 // A small DOM adapter exercises event handlers and persistence without a browser.
-function app(initial=model.freshState(),hash=''){
+function app(initial=model.freshState(),hash='',environment={}){
  const storage=new Map([['zijlijn-v1',JSON.stringify(initial)]]),elements=new Map(),handlers={};
  const element=selector=>{if(!elements.has(selector))elements.set(selector,{innerHTML:'',textContent:'',value:'',style:{},dataset:{},open:false,setAttribute(){},showModal(){this.open=true;},close(){this.open=false;},focus(){},click(){}});return elements.get(selector);};
- const context=vm.createContext({...model,...training,console,URL,Blob,structuredClone,crypto,Date,JSON,Set,Map,FormData:class{constructor(form){this.data=form.data;}get(key){return this.data[key];}},navigator:{onLine:false},location:{hash},document:{querySelector:element,querySelectorAll:()=>[],addEventListener:(type,fn)=>(handlers[type]??=[]).push(fn),visibilityState:'visible',createElement:()=>element('a')},window:{addEventListener(){}},localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},setTimeout:()=>0,clearTimeout(){},setInterval(){},fetch:async()=>{throw Error('offline');}});
+ const context=vm.createContext({...model,...training,console,URL,Blob,structuredClone,crypto,Date,JSON,Set,Map,FormData:class{constructor(form){this.data=form.data;}get(key){return this.data[key];}},navigator:{onLine:false},location:{hash},document:{querySelector:element,querySelectorAll:()=>[],addEventListener:(type,fn)=>(handlers[type]??=[]).push(fn),visibilityState:'visible',createElement:()=>element('a')},window:{addEventListener(){}},localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},setTimeout:()=>0,clearTimeout(){},setInterval(){},fetch:async()=>{throw Error('offline');},...environment});
  vm.runInContext(code,context);
  return {run:s=>vm.runInContext(s,context),stored:()=>JSON.parse(storage.get('zijlijn-v1')),element,emit:async(type,target)=>{for(const h of handlers[type]||[])await h({target,preventDefault(){}});}};
 }
@@ -36,6 +36,39 @@ test('scorecorrectie na afronden en herstellen werken door in archief',()=>{
  const s=model.freshState();s.match.status='ended';s.match.events.push({id:'g',type:'goal',at:0,side:'us'});s.history.push({match:structuredClone(s.match),players:[]});
  const a=app(s);a.run("actions['minus-us']()");assert.equal(model.score(a.stored().history[0].match).us,0);
  a.run("actions.undo()");assert.equal(model.score(a.stored().history[0].match).us,1);model.validateState(a.stored());
+});
+test('alleen bekijken van de samenvatting houdt de stand actueel tot na afronden en herladen',()=>{
+ const s=model.freshState();s.match.status='live';s.match.events.push({id:'g',type:'goal',at:0,side:'us'});
+ const a=app(s);a.run('actions.summary()');assert.match(a.element('#dialog-content').innerHTML,/Tussenstand: 1–0/);
+ a.run("actions.close();actions['goal-us']();actions['confirm-finish']();actions.summary()");
+ assert.match(a.element('#dialog-content').innerHTML,/Eindstand: 2–0/);
+ const reloaded=app(a.stored());reloaded.run(`actions['confirm-new']();actions.summary({dataset:{id:${JSON.stringify(s.match.id)}}})`);
+ assert.match(reloaded.element('#dialog-content').innerHTML,/Eindstand: 2–0/);
+});
+test('handmatig bericht blijft bij scorewijziging bewaard; opnieuw maken volgt daarna weer de score',async()=>{
+ const s=model.freshState();s.match.status='live';
+ const a=app(s);a.run('actions.summary()');
+ await a.emit('input',{id:'summary-text',value:'Mijn eigen tekst',hasAttribute:()=>false});
+ a.run("actions.close();actions['goal-us']();actions.summary()");assert.match(a.element('#dialog-content').innerHTML,/Mijn eigen tekst/);
+ a.run("actions['confirm-summary']()");assert.match(a.element('#dialog-content').innerHTML,/Tussenstand: 1–0/);
+ a.run("actions.close();actions['goal-us']();actions.summary()");assert.match(a.element('#dialog-content').innerHTML,/Tussenstand: 2–0/);
+});
+test('app registreert dezelfde worker-URL na een update en toont geen onnodige updatebadge',async()=>{
+ const version=JSON.parse(readFileSync(new URL('../package.json',import.meta.url))).version;
+ const activeUrl=`./sw.js?v=${version}`,registered=[];
+ const reg={waiting:null,addEventListener(){},async update(){}};
+ const sw={controller:{},ready:Promise.resolve(reg),addEventListener(){},async register(url){registered.push(url);if(url!==activeUrl)reg.waiting={postMessage(){}};return reg;}};
+ const a=app(undefined,'',{navigator:{onLine:false,serviceWorker:sw},fetch:async()=>({ok:true,json:async()=>({version:'9.0.0'})})});
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(registered[0],activeUrl);assert.doesNotMatch(a.element('#app-version').textContent,/Update/);
+ a.run('navigator.onLine=true');await a.run('checkForUpdate(true)');
+ assert.equal(registered.at(-1),'./sw.js?v=9.0.0');assert.match(a.element('#app-version').textContent,/Update/);
+});
+test('mislukte opslag blijft zichtbaar in plaats van een succesbericht',()=>{
+ const a=app(undefined,'',{localStorage:{getItem:()=>null,setItem(){throw Error('quota');}}});
+ a.run("state.players.push({id:'a',name:'Test',present:true});assign(0,'a')");
+ assert.match(a.element('#toast').textContent,/Opslaan lukt niet/);
+ assert.match(a.element('#app').innerHTML,/Maak een back-up/);
 });
 test('alle navigatieschermen renderen na herladen met training en wedstrijdgegevens',()=>{
  const s=model.freshState();const t=training.createTraining({date:'2026-09-18',links:['https://rinus.knvb.nl/exercise/id/1','https://rinus.knvb.nl/exercise/id/2','https://rinus.knvb.nl/exercise/id/3','']});s.trainings.push(t);s.selectedTrainingId=t.id;
