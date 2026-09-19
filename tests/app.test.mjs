@@ -74,3 +74,34 @@ test('alle navigatieschermen renderen na herladen met training en wedstrijdgegev
  const s=model.freshState();const t=training.createTraining({date:'2026-09-18',links:['https://rinus.knvb.nl/exercise/id/1','https://rinus.knvb.nl/exercise/id/2','https://rinus.knvb.nl/exercise/id/3','']});s.trainings.push(t);s.selectedTrainingId=t.id;
  for(const tab of ['wedstrijd','opstelling','training','team']){const a=app(s,'#'+tab);assert.ok(a.element('#app').innerHTML.length>300);}
 });
+test('eigen goal telt direct, maker kiezen telt niet dubbel en verwijderen/herstellen bewaart de maker',()=>{
+ const s=model.freshState();s.players=[{id:'a',name:'Ali',present:true},{id:'b',name:'Bo',present:true}];s.match.status='live';s.match.lineup[0]='b';s.match.initialLineup[0]='b';
+ const a=app(s);a.run("actions['goal-us']()");assert.equal(model.score(a.stored().match).us,1);
+ assert.match(a.element('#dialog-content').innerHTML,/Wie scoorde/);
+ assert.ok(a.element('#dialog-content').innerHTML.indexOf('>Bo<')<a.element('#dialog-content').innerHTML.indexOf('>Ali<'));
+ a.run("actions['assign-scorer']({dataset:{id:'b'}})");assert.equal(a.stored().match.events[0].scorerId,'b');assert.equal(model.score(a.stored().match).us,1);
+ a.run("actions['minus-us']()");assert.equal(model.topScorers(a.stored()).players.length,0);
+ a.run('actions.undo()');assert.equal(model.topScorers(a.stored()).players[0].goals,1);
+ const restored=app(a.stored());restored.run('actions.undo()');assert.equal(model.score(restored.stored().match).us,0);
+});
+test('naam achteraf in oud archief aanvullen behoudt score en nieuwe wedstrijd',()=>{
+ const s=model.freshState();const past=model.freshMatch();past.status='ended';past.events=[{id:'g',type:'goal',at:0,side:'us'}];s.history=[{match:past,players:[{id:'old',name:'Oud teamlid'}]}];
+ const a=app(s,'#team');a.run(`actions.history({dataset:{id:${JSON.stringify(past.id)}}})`);
+ assert.match(a.element('#dialog-content').innerHTML,/Maker kiezen/);
+ a.run(`actions['edit-scorer']({dataset:{match:${JSON.stringify(past.id)},event:'g',history:'true'}});actions['assign-scorer']({dataset:{id:'old'}})`);
+ const saved=a.stored();assert.equal(saved.history[0].match.events[0].scorerId,'old');assert.equal(saved.match.id,s.match.id);assert.equal(model.score(saved.history[0].match).us,1);
+ assert.equal(model.topScorers(model.validateState(saved)).players[0].name,'Oud teamlid');
+ a.run('render()');assert.match(a.element('#app').innerHTML,/Topscorers/);assert.match(a.element('#app').innerHTML,/Oud teamlid/);
+});
+test('overslaan of sluiten bewaart een onbekende goal; tegengoal opent geen keuze',()=>{
+ const s=model.freshState();s.match.status='live';const a=app(s);
+ a.run("actions['goal-us']();actions.close()");assert.equal(model.topScorers(a.stored()).unknown,1);
+ a.run("actions['goal-us']();actions['assign-scorer']({dataset:{id:''}})");assert.equal(model.topScorers(a.stored()).unknown,2);
+ a.run("actions['goal-them']()");assert.equal(a.element('#dialog').open,false);assert.equal(model.score(a.stored().match).them,1);
+});
+test('maker corrigeren via archief van huidige wedstrijd synchroniseert en is herstelbaar',()=>{
+ const s=model.freshState();s.players=[{id:'a',name:'Ali',present:true}];s.match.status='ended';s.match.events=[{id:'g',type:'goal',at:0,side:'us'}];s.history=[{match:structuredClone(s.match),players:[]}];
+ const a=app(s);a.run(`actions['edit-scorer']({dataset:{match:${JSON.stringify(s.match.id)},event:'g',history:'true'}});actions['assign-scorer']({dataset:{id:'a'}})`);
+ const saved=model.validateState(a.stored());assert.equal(saved.history[0].match.events[0].scorerId,'a');assert.equal(model.topScorers(saved).players[0].goals,1);
+ a.run('actions.close();actions.undo()');assert.equal(model.topScorers(a.stored()).unknown,1);assert.equal(model.score(a.stored().match).us,1);assert.equal(a.stored().history[0].match.events[0].scorerId,undefined);
+});

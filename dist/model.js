@@ -21,6 +21,24 @@ export function elapsed(m, now=Date.now()) {
   return Math.max(current,m.halfStartedAt||0,m.events.at(-1)?.at||0);
 }
 export function score(m) { return m.events.reduce((s,e)=>{if(e.type==='goal') s[e.side]++; return s;},{us:0,them:0}); }
+function countScorers(matches,players) {
+  const names=new Map(players.map(p=>[p.id,p.name])),counts=new Map();let unknown=0;
+  for(const m of matches)for(const e of m.events){
+    if(e.type!=='goal'||e.side!=='us')continue;
+    if(!e.scorerId||!names.has(e.scorerId)){unknown++;continue;}
+    counts.set(e.scorerId,(counts.get(e.scorerId)||0)+1);
+  }
+  return {players:[...counts].map(([id,goals])=>({id,name:names.get(id),goals})).sort((a,b)=>b.goals-a.goals||a.name.localeCompare(b.name,'nl')||a.id.localeCompare(b.id)),unknown};
+}
+export function goalScorers(m,players) {return countScorers([m],players);}
+export function topScorers(s) {
+  const matches=new Map(s.history.map(h=>[h.match.id,h.match])),players=new Map();
+  for(const h of s.history)for(const p of h.players)players.set(p.id,p);
+  for(const p of s.players)players.set(p.id,p);
+  // The current finished match can also be in history; its latest correction wins.
+  matches.set(s.match.id,s.match);
+  return countScorers([...matches.values()],[...players.values()]);
+}
 export function minutes(m, now=Date.now()) {
   const total=elapsed(m,now), result={}; let previous=0, lineup=m.initialLineup;
   const add = until => { for(const id of lineup) if(id) result[id]=(result[id]||0)+Math.max(0,until-previous); previous=until; };
@@ -74,7 +92,7 @@ export function validateState(s) {
     if(!Object.hasOwn(FORMATIONS,m.formation)||!Object.hasOwn(FORMATIONS,m.initialFormation))fail();
     let last=0, current=[...m.initialLineup], formation=m.initialFormation;
     for(const e of m.events) {if(!e||!str(e.id)||!num(e.at)||e.at<last||e.at>elapsed(m)+1000)fail();last=e.at;
-      if(e.type==='goal'){if(!['us','them'].includes(e.side))fail();}
+      if(e.type==='goal'){if(!['us','them'].includes(e.side))fail();if(e.scorerId!==undefined&&e.scorerId!==null&&(!str(e.scorerId)||!e.scorerId||e.side!=='us'||(known&&!ids.has(e.scorerId))))fail();}
       else if(e.type==='lineup'){if(!line(e.before,known)||!line(e.lineup,known)||JSON.stringify(e.before)!==JSON.stringify(current))fail();current=e.lineup;}
       else if(e.type==='formation'){if(e.beforeFormation!==formation||!Object.hasOwn(FORMATIONS,e.formation))fail();formation=e.formation;}
       else fail();
@@ -90,7 +108,7 @@ export function validateState(s) {
   const trainingIds=new Set();for(const t of s.trainings){validateTraining(t);if(trainingIds.has(t.id))fail();trainingIds.add(t.id);}
   if(s.trainings.filter(t=>t.run.status==='live').length>1)fail();
   if(s.selectedTrainingId&&!trainingIds.has(s.selectedTrainingId))s.selectedTrainingId='';
-  for(const h of s.history){match(h.match,false);if(h.match.status!=='ended'||!Array.isArray(h.players)||h.players.some(p=>!p||!str(p.id)||!str(p.name)))fail();}
+  for(const h of s.history){match(h.match,false);if(h.match.status!=='ended'||!Array.isArray(h.players)||h.players.some(p=>!p||!str(p.id)||!str(p.name)))fail();const roster=new Set(h.players.map(p=>p.id));if(h.match.events.some(e=>e.type==='goal'&&e.scorerId&&!roster.has(e.scorerId)))fail();}
   return s;
 }
 
@@ -101,14 +119,15 @@ export function removeGoal(m, side) {
   if(index<0)return false;
   m.events.splice(index,1);return true;
 }
-export function matchSummary(m) {
+export function matchSummary(m,players=[]) {
   const s=score(m), opponent=m.opponent||'de tegenstander';
   const fixture=`Nieuwerkerk JO10-8 ${m.home?'thuis tegen':'uit bij'} ${opponent}`;
   if(m.status==='ready')return `⚽ ${fixture}\n\nWe zijn klaar voor de wedstrijd! Kom je ons aanmoedigen? 💚`;
   const result=m.status==='ended'
     ? s.us>s.them?'Gewonnen! 🎉':s.us===s.them?'Een gelijkspel! 🤝':'Op naar de volgende wedstrijd! 💪'
     :'Een update vanaf de zijlijn! 📣';
-  return `⚽ ${fixture}\n\n${m.status==='ended'?'Eindstand':'Tussenstand'}: ${s.us}–${s.them} (Nieuwerkerk eerst).\n${result}\n\n${m.status==='ended'?'Bedankt voor het aanmoedigen, ouders en supporters!':'Moedig je mee aan?'} 💚`;
+  const makers=goalScorers(m,players),goals=makers.players.length?`\n\nDoelpuntenmakers: ${makers.players.map(p=>`${p.name} (${p.goals})`).join(', ')}.${makers.unknown?` Nog zonder naam: ${makers.unknown}.`:''}`:'';
+  return `⚽ ${fixture}\n\n${m.status==='ended'?'Eindstand':'Tussenstand'}: ${s.us}–${s.them} (Nieuwerkerk eerst).\n${result}${goals}\n\n${m.status==='ended'?'Bedankt voor het aanmoedigen, ouders en supporters!':'Moedig je mee aan?'} 💚`;
 }
 
 const GAME_KEYS=['lineup','initialLineup','formation','initialFormation','events','half','halfStartedAt','timeouts','swapSnoozeAt'];

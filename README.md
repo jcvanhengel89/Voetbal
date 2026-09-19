@@ -103,3 +103,13 @@ Offline-updates halen alle appbestanden opnieuw op met cache-revalidatie. Bij ee
 - De updatecontrole gebruikt bij opstarten en bijwerken dezelfde worker-URL, zodat een reeds geladen versie geen extra update veroorzaakt.
 - Een opslagfout blijft zichtbaar en wordt niet overschreven door een succesbericht.
 - Als de systeemklok terug wordt gezet, blijft de lopende wedstrijd ten minste op het laatste vastgelegde actie- of rustmoment. Dat voorkomt dat eigen wedstrijdgegevens bij herladen als ongeldig worden geweigerd. De klok kan in dit uitzonderlijke geval tijdelijk blijven staan; voorwaartse systeemtijdsprongen worden niet gecorrigeerd.
+
+### Versie 1.4.0 — doelpuntenmakers en topscorers
+
+- Bij + Goal voor Nieuwerkerk telt het doelpunt direct. Kies daarna de maker; veldspelers staan bovenaan. Onbekend / overslaan of het venster sluiten bewaart het doelpunt zonder maker.
+- Bij Wedstrijdverloop kun je de maker achteraf kiezen of wijzigen. Bij Mijn team → Vorige wedstrijden → [wedstrijd] staan hiervoor aparte knoppen onder Doelpuntenmakers. Ook goals uit oudere versies kunnen zo worden aangevuld. De stand verandert daardoor niet.
+- Mijn team toont Topscorers over alle lokaal bewaarde wedstrijden, inclusief de huidige wedstrijd. Een afgeronde wedstrijd telt eenmaal mee. Goals zonder maker worden apart vermeld; gelijke aantallen krijgen dezelfde plaats.
+- Scorecorrecties en herstel werken automatisch door in de telling. De eerste keuze van een maker hoort bij dezelfde herstelactie als het nieuwe doelpunt. Een latere correctie in de huidige wedstrijd is apart herstelbaar. In een oude wedstrijd corrigeer je de maker opnieuw via de knop.
+- De automatische samenvatting bevat de geregistreerde makers en hun aantallen. Zelf bewerkte berichten blijven behouden; gebruik zo nodig Opnieuw maken.
+- Namen in historische wedstrijden blijven beschikbaar wanneer een speler later wordt verwijderd. Spelers worden op hun vaste ID geteld, niet op hun naam. De huidige naam wordt gebruikt in de topscorerslijst.
+- Makers worden met de wedstrijd opgeslagen en gaan mee in back-ups. Oude back-ups blijven geldig; oude goals krijgen niet automatisch een maker.
