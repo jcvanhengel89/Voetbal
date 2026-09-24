@@ -1,6 +1,6 @@
 import {BLOCKS,nextTrainingDate,defaultStart,createTraining,schedule,trainingElapsed,startTraining,pauseTraining,nextBlock,trainingText} from './training.js';
 import {freshState,freshMatch,uid,elapsed,score,minutes,start,pause,setLineup,setFormation,positionNames,FORMATIONS,normalizeTeamUrl,undo,validateState,removeGoal,matchSummary,changeGame,undoGame,reminders,backupDue,topScorers} from './model.js';
-const APP_VERSION='1.5.0';
+const APP_VERSION='1.5.1';
 const KEY='zijlijn-v1', $=s=>document.querySelector(s), app=$('#app'), dialog=$('#dialog');
 let state=freshState(), storageError='', tab=location.hash.slice(1)||'wedstrijd', toastTimer, wakeLock=null, wakePending=false, presentationOpen=false, presentationFullscreen=false;
 let swRegistration, waitingWorker, updateCheck='Nog niet gecontroleerd', latestVersion='', lastUpdateCheck=0, checkingUpdate=false;
@@ -114,7 +114,11 @@ async function showLineup(){
  try{
   if(!document.fullscreenElement&&document.documentElement.requestFullscreen){
    await document.documentElement.requestFullscreen();
-   if(presentationOpen)presentationFullscreen=true;
+   if(presentationOpen&&dialog.open){
+    presentationFullscreen=true;
+    // Fullscreen puts the root on top; re-open the dialog above that layer.
+    dialog.close();dialog.showModal();
+   }
    else if(document.fullscreenElement===document.documentElement)await document.exitFullscreen?.();
   }
  }catch{}

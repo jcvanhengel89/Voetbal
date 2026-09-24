@@ -117,3 +117,5 @@ Offline-updates halen alle appbestanden opnieuw op met cache-revalidatie. Bij ee
 ### Versie 1.5.0 — ijsgrijs en blauw, voorbespreking
 
 Een rustige lichte vormgeving, blauwe accenten en zwevende glasnavigatie. Via **Opstelling tonen** verschijnt een alleen-lezen veld over het hele scherm, met grote namen en de wisselbank. Liggend op de telefoon draait de speelrichting mee naar links-rechts. De app vraagt waar ondersteund om volledig scherm en houdt het scherm wakker zolang de voorbespreking open is. Sluit met het kruisje; scores, timers en opstelling veranderen niet.
+
+Versie 1.5.1 houdt het presentatieveld boven de pagina wanneer de browser naar volledig scherm schakelt.

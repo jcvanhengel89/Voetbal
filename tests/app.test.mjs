@@ -8,7 +8,7 @@ const code=readFileSync(new URL('../dist/app.js',import.meta.url),'utf8').replac
 // A small DOM adapter exercises event handlers and persistence without a browser.
 function app(initial=model.freshState(),hash='',environment={}){
  const storage=new Map([['zijlijn-v1',JSON.stringify(initial)]]),elements=new Map(),handlers={};
- const element=selector=>{if(!elements.has(selector))elements.set(selector,{innerHTML:'',textContent:'',value:'',style:{},dataset:{},open:false,classList:{values:new Set(),add(v){this.values.add(v)},remove(v){this.values.delete(v)},contains(v){return this.values.has(v)}},listeners:{},addEventListener(t,f){(this.listeners[t]??=[]).push(f)},setAttribute(){},showModal(){this.open=true;},close(){this.open=false;for(const f of this.listeners.close||[])f();},focus(){},click(){}});return elements.get(selector);};
+ const element=selector=>{if(!elements.has(selector))elements.set(selector,{innerHTML:'',textContent:'',value:'',style:{},dataset:{},open:false,classList:{values:new Set(),add(v){this.values.add(v)},remove(v){this.values.delete(v)},contains(v){return this.values.has(v)}},listeners:{},addEventListener(t,f){(this.listeners[t]??=[]).push(f)},setAttribute(){},showModal(){this.open=true;},close(){this.open=false;queueMicrotask(()=>{for(const f of this.listeners.close||[])f();});},focus(){},click(){}});return elements.get(selector);};
  const context=vm.createContext({...model,...training,console,URL,Blob,structuredClone,crypto,Date,JSON,Set,Map,FormData:class{constructor(form){this.data=form.data;}get(key){return this.data[key];}},navigator:{onLine:false},location:{hash},document:{documentElement:{},querySelector:element,querySelectorAll:()=>[],addEventListener:(type,fn)=>(handlers[type]??=[]).push(fn),visibilityState:'visible',createElement:()=>element('a')},window:{addEventListener(){}},localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},setTimeout:()=>0,clearTimeout(){},setInterval(){},fetch:async()=>{throw Error('offline');},...environment});
  vm.runInContext(code,context);
  return {run:s=>vm.runInContext(s,context),stored:()=>JSON.parse(storage.get('zijlijn-v1')),element,emit:async(type,target)=>{for(const h of handlers[type]||[])await h({target,preventDefault(){}});}};
@@ -143,4 +143,10 @@ test('voorbespreking gebruikt document voor fullscreen en ruimt alleen eigen ful
  await a.run("actions['show-lineup']()");assert.equal(a.run('presentationFullscreen'),true);
  a.run('actions.close()');assert.equal(a.run('document.fullscreenElement'),null);
  a.run('document.fullscreenElement=document.documentElement');await a.run("actions['show-lineup']()");a.run('actions.close()');assert.equal(a.run('document.fullscreenElement===document.documentElement'),true);
+});
+
+test('voorbespreking blijft bovenop na asynchroon openen van native fullscreen',async()=>{
+ const a=app();const order=[];const d=a.element('#dialog'),show=d.showModal.bind(d);d.showModal=()=>{order.push('dialog');show()};
+ a.run('document.documentElement.requestFullscreen=async()=>{document.fullscreenElement=document.documentElement}');
+ await a.run("actions['show-lineup']()");assert.deepEqual(order,['dialog','dialog']);assert.equal(d.open,true);assert.equal(a.run('presentationOpen'),true);
 });
