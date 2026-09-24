@@ -1,8 +1,8 @@
 import {BLOCKS,nextTrainingDate,defaultStart,createTraining,schedule,trainingElapsed,startTraining,pauseTraining,nextBlock,trainingText} from './training.js';
 import {freshState,freshMatch,uid,elapsed,score,minutes,start,pause,setLineup,setFormation,positionNames,FORMATIONS,normalizeTeamUrl,undo,validateState,removeGoal,matchSummary,changeGame,undoGame,reminders,backupDue,topScorers} from './model.js';
-const APP_VERSION='1.4.0';
+const APP_VERSION='1.5.0';
 const KEY='zijlijn-v1', $=s=>document.querySelector(s), app=$('#app'), dialog=$('#dialog');
-let state=freshState(), storageError='', tab=location.hash.slice(1)||'wedstrijd', toastTimer, wakeLock;
+let state=freshState(), storageError='', tab=location.hash.slice(1)||'wedstrijd', toastTimer, wakeLock=null, wakePending=false, presentationOpen=false, presentationFullscreen=false;
 let swRegistration, waitingWorker, updateCheck='Nog niet gecontroleerd', latestVersion='', lastUpdateCheck=0, checkingUpdate=false;
 try {const raw=localStorage.getItem(KEY);if(raw)state=validateState(JSON.parse(raw));}catch(e){storageError='Je opgeslagen gegevens konden niet worden geladen. Download eerst een herstelbestand via Mijn team. Nieuwe wijzigingen worden nog niet opgeslagen.';}
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -15,21 +15,21 @@ const dateLabel=m=>m.date?new Date(m.date).toLocaleString('nl-NL',{weekday:'shor
 function toast(s){$('#toast').textContent=storageError||s;$('#toast').style.display='block';clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').style.display='none',4000);}
 function save(){if(storageError)return;try{localStorage.setItem(KEY,JSON.stringify(state));}catch{storageError='Opslaan lukt niet. Je gegevens staan nu alleen in dit scherm. Maak een back-up via Mijn team.';toast(storageError);}}
 function update(){save();render();}
-function modal(title,html){$('#dialog-content').innerHTML=`<div class="dialog-head"><h2>${title}</h2><button class="close" data-action="close" aria-label="Sluiten">×</button></div>${html}`;if(!dialog.open)dialog.showModal();}
+function modal(title,html){$('#dialog-content').innerHTML=`<div class="dialog-head"><h2 id="dialog-title">${title}</h2><button class="close" data-action="close" aria-label="Sluiten">×</button></div>${html}`;if(!dialog.open)dialog.showModal();}
 function confirmAction(title,text,action,label='Bevestigen'){modal(title,`<p>${text}</p><div class="row"><button data-action="close">Annuleren</button><button class="primary" data-action="${action}">${label}</button></div>`);}
 function render(){
  if(!['wedstrijd','opstelling','training','team'].includes(tab))tab='wedstrijd';
  document.querySelectorAll('[data-tab]').forEach(b=>{b.classList.toggle('active',b.dataset.tab===tab);b.setAttribute('aria-current',b.dataset.tab===tab?'page':'false');});
  app.innerHTML=(storageError?`<div class="warning" role="alert">${esc(storageError)}</div>`:'')+(tab==='wedstrijd'?matchView():tab==='opstelling'?lineupView():tab==='training'?trainingView():teamView());tick();
 }
-function pitch(){
- const m=state.match, labels=positionNames(m);
- return `<div class="pitch formation-${m.formation}" aria-label="Opstelling ${m.formation}">${m.lineup.map((id,i)=>`<button class="position pos-${i} ${id?'':'empty'}" data-action="position" data-index="${i}" ${m.status==='ended'?'disabled':''} aria-label="${labels[i]}: ${esc(name(id))}"><span class="shirt">${id?esc(initials(name(id))):'+'}</span><span class="position-name">${labels[i]}</span><span class="player-name">${id?esc(name(id)):'Kies speler'}</span></button>`).join('')}</div>`;
+function pitch(readOnly=false){
+ const m=state.match, labels=positionNames(m), tag=readOnly?'div':'button';
+ return `<div class="pitch formation-${m.formation}" aria-label="Opstelling ${m.formation}">${m.lineup.map((id,i)=>`<${tag} class="position pos-${i} ${id?'':'empty'}" ${readOnly?'':`data-action="position" data-index="${i}" ${m.status==='ended'?'disabled':''}`} aria-label="${labels[i]}: ${esc(name(id))}"><span class="shirt">${id?esc(initials(name(id))):'+'}</span><span class="position-name">${labels[i]}</span><span class="player-name">${id?esc(name(id)):readOnly?'Vrije plek':'Kies speler'}</span></${tag}>`).join('')}</div>`;
 }
 function formationSelect(){return `<label class="formation-select">Formatie<select id="formation" ${state.match.status==='ended'?'disabled':''}>${Object.keys(FORMATIONS).map(f=>`<option value="${f}" ${state.match.formation===f?'selected':''}>${f}</option>`).join('')}</select></label>`;}
 
 function benchButtons(){const times=minutes(state.match);return bench().map(p=>`<button data-action="bench" data-id="${esc(p.id)}" ${state.match.status==='ended'?'disabled':''}><strong>${esc(p.name)}</strong><small>${clock(times[p.id]||0)} gespeeld</small></button>`).join('');}
-function lineupCard(showBench=true){return `<section class="card"><div class="card-head"><h2>Op het veld</h2><span class="pill">${state.match.lineup.filter(Boolean).length} / 6</span></div>${formationSelect()}${pitch()}${showBench?`<div class="subtle-row"><h3>Wisselbank</h3><span class="small muted">${bench().length} spelers</span></div><div class="bench">${benchButtons()}</div>`:''}<p class="hint">${state.players.length?'Tik op een positie of bankspeler om te wisselen.':'Voeg je spelers toe bij Mijn team en tik op een positie.'}</p></section>`;}
+function lineupCard(showBench=true){return `<section class="card"><div class="card-head"><h2>Op het veld</h2><span class="pill">${state.match.lineup.filter(Boolean).length} / 6</span></div>${formationSelect()}${pitch()}<button class="wide presentation-button" data-action="show-lineup">${expandIcon()} Opstelling tonen</button>${showBench?`<div class="subtle-row"><h3>Wisselbank</h3><span class="small muted">${bench().length} spelers</span></div><div class="bench">${benchButtons()}</div>`:''}<p class="hint">${state.players.length?'Tik op een positie of bankspeler om te wisselen.':'Voeg je spelers toe bij Mijn team en tik op een positie.'}</p></section>`;}
 function matchView(){
  const m=state.match,s=score(m),live=m.status==='live',ended=m.status==='ended',last=state.undoHistory.at(-1);
  const team=(side,label)=>`<div><span class="team-name">${esc(label)}</span><strong class="score-value">${s[side]}</strong><div class="score-controls"><button class="goal-minus" data-action="minus-${side}" aria-label="Doelpunt verwijderen voor ${esc(label)}" ${s[side]===0?'disabled':''}>−</button><button class="goal ${side==='us'?'us':''}" data-action="goal-${side}" aria-label="Doelpunt voor ${esc(label)}" ${!live&&!ended?'disabled':''}>+ Goal</button></div></div>`;
@@ -85,11 +85,45 @@ function choosePosition(index){
 }
 function assign(index,id){const m=state.match;if(id&&!present().some(p=>p.id===id))throw Error('Deze speler is niet aanwezig.');const line=[...m.lineup];if(line[index]===id){dialog.close();return;}const oldIndex=line.indexOf(id);if(id&&oldIndex!==-1)line[oldIndex]=line[index];line[index]=id||null;changeGame(state,m.status==='ready'?'opstelling':'wissel',()=>setLineup(m,line));dialog.close();update();toast(m.status==='ready'?'Opstelling opgeslagen':'Wissel opgeslagen');}
 function editMatch(){const m=state.match;modal('Wedstrijd instellen',`<form id="match-form" class="stack"><label>Tegenstander<input name="opponent" value="${esc(m.opponent)}" maxlength="80" placeholder="Bijvoorbeeld: tegenstander JO10-…"></label><label>Aftrap<input type="datetime-local" name="date" value="${esc(m.date)}"></label><label>Thuis of uit<select name="home"><option value="true" ${m.home?'selected':''}>Thuis</option><option value="false" ${!m.home?'selected':''}>Uit</option></select></label><label>Minuten per helft<input type="number" name="halfMinutes" min="1" max="60" value="${m.halfMinutes}" required></label><button class="primary" type="submit">Opslaan</button></form>`);}
-async function keepAwake(){try{if((state.match.startedAt!==null||state.trainings.some(t=>t.run.startedAt!==null))&&document.visibilityState==='visible'&&navigator.wakeLock&&!wakeLock){wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>wakeLock=null);}else if(state.match.startedAt===null&&!state.trainings.some(t=>t.run.startedAt!==null)&&wakeLock){await wakeLock.release();wakeLock=null;}}catch{}}
+function wantsWakeLock(){return presentationOpen||state.match.startedAt!==null||state.trainings.some(t=>t.run.startedAt!==null);}
+async function keepAwake(){
+ try{
+  if(wantsWakeLock()&&document.visibilityState==='visible'&&navigator.wakeLock&&!wakeLock&&!wakePending){
+   wakePending=true;
+   try{
+    const lock=await navigator.wakeLock.request('screen');
+    if(!wantsWakeLock()||document.visibilityState!=='visible'){await lock.release();return;}
+    wakeLock=lock;lock.addEventListener('release',()=>{if(wakeLock===lock)wakeLock=null;});
+   }finally{wakePending=false;}
+  }else if(!wantsWakeLock()&&wakeLock){const lock=wakeLock;wakeLock=null;await lock.release();}
+ }catch{}
+}
+function expandIcon(){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg>';}
+function endPresentation(){
+ if(!presentationOpen)return;
+ presentationOpen=false;dialog.classList.remove('presentation');
+ if(presentationFullscreen&&document.fullscreenElement===document.documentElement)document.exitFullscreen?.().catch(()=>{});
+ presentationFullscreen=false;
+ keepAwake();
+}
+async function showLineup(){
+ presentationOpen=true;dialog.classList.add('presentation');
+ $('#dialog-content').innerHTML=`<header class="presentation-head"><div><p class="eyebrow">Voorbespreking · ${state.match.formation}</p><h2 id="dialog-title">Nieuwerkerk JO10-8</h2></div><button class="close" data-action="close" aria-label="Voorbespreking sluiten">×</button></header>${pitch(true)}<footer class="presentation-bench"><strong>Wisselbank</strong><div>${bench().map(p=>`<span>${esc(p.name)}</span>`).join('')||'<span>Geen bankspelers</span>'}</div></footer>`;
+ if(!dialog.open)dialog.showModal();
+ keepAwake();
+ try{
+  if(!document.fullscreenElement&&document.documentElement.requestFullscreen){
+   await document.documentElement.requestFullscreen();
+   if(presentationOpen)presentationFullscreen=true;
+   else if(document.fullscreenElement===document.documentElement)await document.exitFullscreen?.();
+  }
+ }catch{}
+}
+dialog.addEventListener('close',()=>{if(!dialog.open)endPresentation();});
 function download(text,filename){const u=URL.createObjectURL(new Blob([text],{type:'application/json'}));const a=document.createElement('a');a.href=u;a.download=filename;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);}
 let pendingImport=null;
 const actions={
- 'close':()=>dialog.close(), 'edit-match':editMatch,
+ 'show-lineup':showLineup, 'close':()=>{endPresentation();dialog.close();}, 'edit-match':editMatch,
  'team-link':()=>modal('Link naar JO10-8',`<form id="team-link-form" class="stack"><p class="muted small">Plak de link van de teampagina uit voetbal.nl. Deze wordt alleen op dit toestel opgeslagen. Of de link de voetbal.nl-app opent, hangt af van je telefoon en de link.</p><label>Voetbal.nl-teamlink<input name="teamUrl" type="url" value="${esc(state.teamUrl)}" maxlength="2048" placeholder="https://…" autocomplete="off"></label><button class="primary" type="submit">Opslaan</button><p class="hint">Laat het veld leeg om de algemene voetbal.nl-pagina te gebruiken. Een link openen haalt geen wedstrijden op in Zijlijn.</p></form>`), 'version':showVersion, 'check-update':()=>checkForUpdate(true), 'apply-update':applyUpdate,
  'position':b=>choosePosition(Number(b.dataset.index)),
  'assign':b=>assign(Number(b.dataset.index),b.dataset.id),

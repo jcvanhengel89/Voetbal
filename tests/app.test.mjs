@@ -8,8 +8,8 @@ const code=readFileSync(new URL('../dist/app.js',import.meta.url),'utf8').replac
 // A small DOM adapter exercises event handlers and persistence without a browser.
 function app(initial=model.freshState(),hash='',environment={}){
  const storage=new Map([['zijlijn-v1',JSON.stringify(initial)]]),elements=new Map(),handlers={};
- const element=selector=>{if(!elements.has(selector))elements.set(selector,{innerHTML:'',textContent:'',value:'',style:{},dataset:{},open:false,setAttribute(){},showModal(){this.open=true;},close(){this.open=false;},focus(){},click(){}});return elements.get(selector);};
- const context=vm.createContext({...model,...training,console,URL,Blob,structuredClone,crypto,Date,JSON,Set,Map,FormData:class{constructor(form){this.data=form.data;}get(key){return this.data[key];}},navigator:{onLine:false},location:{hash},document:{querySelector:element,querySelectorAll:()=>[],addEventListener:(type,fn)=>(handlers[type]??=[]).push(fn),visibilityState:'visible',createElement:()=>element('a')},window:{addEventListener(){}},localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},setTimeout:()=>0,clearTimeout(){},setInterval(){},fetch:async()=>{throw Error('offline');},...environment});
+ const element=selector=>{if(!elements.has(selector))elements.set(selector,{innerHTML:'',textContent:'',value:'',style:{},dataset:{},open:false,classList:{values:new Set(),add(v){this.values.add(v)},remove(v){this.values.delete(v)},contains(v){return this.values.has(v)}},listeners:{},addEventListener(t,f){(this.listeners[t]??=[]).push(f)},setAttribute(){},showModal(){this.open=true;},close(){this.open=false;for(const f of this.listeners.close||[])f();},focus(){},click(){}});return elements.get(selector);};
+ const context=vm.createContext({...model,...training,console,URL,Blob,structuredClone,crypto,Date,JSON,Set,Map,FormData:class{constructor(form){this.data=form.data;}get(key){return this.data[key];}},navigator:{onLine:false},location:{hash},document:{documentElement:{},querySelector:element,querySelectorAll:()=>[],addEventListener:(type,fn)=>(handlers[type]??=[]).push(fn),visibilityState:'visible',createElement:()=>element('a')},window:{addEventListener(){}},localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},setTimeout:()=>0,clearTimeout(){},setInterval(){},fetch:async()=>{throw Error('offline');},...environment});
  vm.runInContext(code,context);
  return {run:s=>vm.runInContext(s,context),stored:()=>JSON.parse(storage.get('zijlijn-v1')),element,emit:async(type,target)=>{for(const h of handlers[type]||[])await h({target,preventDefault(){}});}};
 }
@@ -104,4 +104,43 @@ test('maker corrigeren via archief van huidige wedstrijd synchroniseert en is he
  const a=app(s);a.run(`actions['edit-scorer']({dataset:{match:${JSON.stringify(s.match.id)},event:'g',history:'true'}});actions['assign-scorer']({dataset:{id:'a'}})`);
  const saved=model.validateState(a.stored());assert.equal(saved.history[0].match.events[0].scorerId,'a');assert.equal(model.topScorers(saved).players[0].goals,1);
  a.run('actions.close();actions.undo()');assert.equal(model.topScorers(a.stored()).unknown,1);assert.equal(model.score(a.stored().match).us,1);assert.equal(a.stored().history[0].match.events[0].scorerId,undefined);
+});
+
+const settle=()=>new Promise(resolve=>setImmediate(resolve));
+test('voorbespreking toont beide formaties alleen-lezen en bewaart wedstrijd ongewijzigd',async()=>{
+ for(const formation of ['1-2-2-1','1-2-1-2']){
+  const s=model.freshState();s.players=Array.from({length:8},(_,i)=>({id:String(i),name:'Speler '+i,present:true}));s.match.formation=formation;s.match.initialFormation=formation;s.match.lineup=s.players.slice(0,6).map(p=>p.id);s.match.initialLineup=[...s.match.lineup];
+  const a=app(s);const before=JSON.stringify(a.stored());
+  await a.run("actions['show-lineup']()");
+  assert.equal(a.element('#dialog').open,true);assert.equal(a.element('#dialog').classList.contains('presentation'),true);
+  const html=a.element('#dialog-content').innerHTML;for(let i=0;i<8;i++)assert.match(html,new RegExp('Speler '+i));
+  assert.match(html,new RegExp(formation));assert.doesNotMatch(html,/data-action="(?:position|bench|assign)"/);
+  a.run('actions.close()');assert.equal(a.run('presentationOpen'),false);assert.equal(a.element('#dialog').classList.contains('presentation'),false);assert.equal(JSON.stringify(a.stored()),before);
+ }
+});
+test('voorbespreking houdt scherm wakker en sluit ook zonder fullscreen-ondersteuning',async()=>{
+ let requests=0,releases=0;const lock={addEventListener(){},async release(){releases++}};
+ const a=app(undefined,'',{navigator:{onLine:false,wakeLock:{async request(){requests++;return lock}}}});
+ a.run("document.documentElement.requestFullscreen=async()=>{throw Error('unsupported')}");
+ await a.run("actions['show-lineup']()");await settle();assert.equal(requests,1);assert.equal(a.element('#dialog').open,true);
+ a.run('dialog.close()');await settle();assert.equal(releases,1);assert.equal(a.run('presentationOpen'),false);
+ a.run('actions.summary()');assert.equal(a.element('#dialog').classList.contains('presentation'),false);
+});
+test('sluiten voorbespreking laat actieve wedstrijdklok wakker',async()=>{
+ let releases=0;const s=model.freshState();s.match.status='live';s.match.startedAt=Date.now();
+ const a=app(s,'',{navigator:{onLine:false,wakeLock:{async request(){return {addEventListener(){},async release(){releases++}}}}}});
+ await settle();await a.run("actions['show-lineup']()");a.run('actions.close()');await settle();assert.equal(releases,0);
+});
+test('late schermvergrendeling wordt vrijgegeven na snel sluiten',async()=>{
+ let resolve,releases=0,requests=0;
+ const a=app(undefined,'',{navigator:{onLine:false,wakeLock:{request(){requests++;return new Promise(r=>resolve=r)}}}});
+ await a.run("actions['show-lineup']()");a.run('keepAwake();actions.close()');assert.equal(requests,1);
+ resolve({addEventListener(){},async release(){releases++}});await settle();assert.equal(releases,1);assert.equal(a.run('wakeLock'),null);
+});
+
+test('voorbespreking gebruikt document voor fullscreen en ruimt alleen eigen fullscreen op',async()=>{
+ const a=app();a.run('document.documentElement.requestFullscreen=async()=>{document.fullscreenElement=document.documentElement};document.exitFullscreen=async()=>{document.fullscreenElement=null}');
+ await a.run("actions['show-lineup']()");assert.equal(a.run('presentationFullscreen'),true);
+ a.run('actions.close()');assert.equal(a.run('document.fullscreenElement'),null);
+ a.run('document.fullscreenElement=document.documentElement');await a.run("actions['show-lineup']()");a.run('actions.close()');assert.equal(a.run('document.fullscreenElement===document.documentElement'),true);
 });

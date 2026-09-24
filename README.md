@@ -113,3 +113,7 @@ Offline-updates halen alle appbestanden opnieuw op met cache-revalidatie. Bij ee
 - De automatische samenvatting bevat de geregistreerde makers en hun aantallen. Zelf bewerkte berichten blijven behouden; gebruik zo nodig Opnieuw maken.
 - Namen in historische wedstrijden blijven beschikbaar wanneer een speler later wordt verwijderd. Spelers worden op hun vaste ID geteld, niet op hun naam. De huidige naam wordt gebruikt in de topscorerslijst.
 - Makers worden met de wedstrijd opgeslagen en gaan mee in back-ups. Oude back-ups blijven geldig; oude goals krijgen niet automatisch een maker.
+
+### Versie 1.5.0 — ijsgrijs en blauw, voorbespreking
+
+Een rustige lichte vormgeving, blauwe accenten en zwevende glasnavigatie. Via **Opstelling tonen** verschijnt een alleen-lezen veld over het hele scherm, met grote namen en de wisselbank. Liggend op de telefoon draait de speelrichting mee naar links-rechts. De app vraagt waar ondersteund om volledig scherm en houdt het scherm wakker zolang de voorbespreking open is. Sluit met het kruisje; scores, timers en opstelling veranderen niet.
