@@ -126,3 +126,13 @@ Versie 1.5.1 houdt het presentatieveld boven de pagina wanneer de browser naar v
 - Notities, samenvatting en verloop staan onder Verslag & samenvatting; na afronden opent dit vanzelf.
 - Vorige wedstrijden: open een wedstrijd via Mijn team en kies Wedstrijd verwijderen. Na bevestiging vervallen ook de goals in de topscorers. Als dit de laatst afgeronde wedstrijd op het wedstrijdscherm is, wordt dat scherm klaargezet voor een nieuwe wedstrijd. Team en trainingen blijven behouden. Verwijderen is definitief, tenzij je een eerdere back-up terugzet.
 - Datum/tijd en overige formuliervelden zijn begrensd tot de beschikbare breedte, inclusief de minimale breedte van native mobiele datumvelden.
+
+### Versie 1.7.0 — voorkeurslinies, wisselvoorstellen en speeltijdstatistieken
+
+- Mijn team → Bewerk: Geen voorkeur, Verdediging, Middenveld of Aanval. Oude spelers blijven zonder voorkeur.
+- Tijdens de wedstrijd: Wisselvoorstel op de wisselbank. Maximaal twee voorstellen: minst spelende bankspelers erin; meest spelende veldspelers eruit. Een verschil van minimaal één speelminuut voorkomt meteen terugwisselen. De keeper blijft staan. Binnen één minuut vergelijkbare speeltijd helpen linievoorkeur en afwisseling de plek kiezen. Voorkeur weegt als vijf minuten ervaring op die linie, zodat een nieuwe linie na verloop van tijd ook kan winnen.
+- Keuzes zijn aanpasbaar, afzonderlijk over te slaan en pas na bevestiging actief. Herstel maakt de hele bevestigde wissel ongedaan. Een gewijzigde opstelling of wedstrijd maakt een oud voorstel ongeldig.
+- Bij overgang naar de tweede helft wordt een andere keeper voorgesteld. Hij blijft buiten normale wisselvoorstellen. Een kandidaat uit het veld ruilt met de huidige keeper van positie; een bankspeler zet de keeper op de bank. Annuleren verandert de opstelling niet; de knop Keeper tweede helft blijft dan beschikbaar.
+- Historie toont Speeltijd deze wedstrijd direct geopend, inclusief keepen. Nieuwe archieven bewaren ook aanwezigheid, zodat nul gespeelde minuten te onderscheiden zijn van afwezigheid. Oude wedstrijden tonen geen verzonnen aanwezigheid.
+- Mijn team → Totale speeltijd: totale minuten, aantal aanwezige wedstrijden, gemiddelde en minuten van de laatst bewaarde wedstrijd. Alleen afgeronde wedstrijden tellen mee, precies eenmaal; verwijderen werkt direct door. Bij oudere gegevens zonder aanwezigheid telt voor het gemiddelde alleen geregistreerde deelname.
+- Alle tijden zijn min:sec (ook totalen boven een uur). Suggesties gebruiken huidige wedstrijdminuten; historische totalen zijn ter informatie bij voorbereiding, zodat afwezigheid niet automatisch wordt gecompenseerd.

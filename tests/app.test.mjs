@@ -4,12 +4,13 @@ import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 import * as model from '../dist/model.js';
 import * as training from '../dist/training.js';
+import * as coaching from '../dist/coaching.js';
 const code=readFileSync(new URL('../dist/app.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
 // A small DOM adapter exercises event handlers and persistence without a browser.
 function app(initial=model.freshState(),hash='',environment={}){
  const storage=new Map([['zijlijn-v1',JSON.stringify(initial)]]),elements=new Map(),handlers={};
  const element=selector=>{if(!elements.has(selector))elements.set(selector,{innerHTML:'',textContent:'',value:'',style:{},dataset:{},open:false,classList:{values:new Set(),add(v){this.values.add(v)},remove(v){this.values.delete(v)},contains(v){return this.values.has(v)}},listeners:{},addEventListener(t,f){(this.listeners[t]??=[]).push(f)},setAttribute(){},showModal(){this.open=true;},close(){this.open=false;queueMicrotask(()=>{for(const f of this.listeners.close||[])f();});},focus(){},click(){}});return elements.get(selector);};
- const context=vm.createContext({...model,...training,console,URL,Blob,structuredClone,crypto,Date,JSON,Set,Map,FormData:class{constructor(form){this.data=form.data;}get(key){return this.data[key];}},navigator:{onLine:false},location:{hash},document:{documentElement:{},querySelector:element,querySelectorAll:()=>[],addEventListener:(type,fn)=>(handlers[type]??=[]).push(fn),visibilityState:'visible',createElement:()=>element('a')},window:{addEventListener(){}},localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},setTimeout:()=>0,clearTimeout(){},setInterval(){},fetch:async()=>{throw Error('offline');},...environment});
+ const context=vm.createContext({...model,...training,...coaching,console,URL,Blob,structuredClone,crypto,Date,JSON,Set,Map,FormData:class{constructor(form){this.data=form.data;}get(key){return this.data[key];}},navigator:{onLine:false},location:{hash},document:{documentElement:{},querySelector:element,querySelectorAll:()=>[],addEventListener:(type,fn)=>(handlers[type]??=[]).push(fn),visibilityState:'visible',createElement:()=>element('a')},window:{addEventListener(){}},localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},setTimeout:()=>0,clearTimeout(){},setInterval(){},fetch:async()=>{throw Error('offline');},...environment});
  vm.runInContext(code,context);
  return {run:s=>vm.runInContext(s,context),stored:()=>JSON.parse(storage.get('zijlijn-v1')),element,emit:async(type,target)=>{for(const h of handlers[type]||[])await h({target,preventDefault(){}});}};
 }
@@ -189,4 +190,25 @@ test('historie verwijderen houdt de grens tussen geback-upte en nieuwe wedstrijd
   assert.equal(model.backupDue(s),true);model.deleteHistory(s,s.history[index].match.id);
   assert.equal(s.backupMatches,index===0?2:3);assert.equal(model.backupDue(s),index===0);
  }
+});
+
+test('voorkeurslinie opslaan blijft na herladen beschikbaar',async()=>{
+ const s=model.freshState();s.players=[{id:'a',name:'Ali',present:true}];const a=app(s,'#team');a.run("actions['edit-player']({dataset:{id:'a'}})");assert.match(a.element('#dialog-content').innerHTML,/Voorkeurslinie/);
+ await a.emit('submit',{id:'player-form',dataset:{id:'a'},data:{name:'Ali',preferredLine:'midfield'}});assert.equal(a.stored().players[0].preferredLine,'midfield');
+ const reloaded=app(a.stored(),'#team');assert.match(reloaded.element('#app').innerHTML,/Middenveld/);
+});
+test('voorstel vraagt bevestiging, is aanpasbaar en wordt als één herstelbare wissel bewaard',async()=>{
+ const s=model.freshState();s.players='abcdefgh'.split('').map(id=>({id,name:id,present:true}));model.setLineup(s.match,'abcdef'.split(''));model.start(s.match,0);model.pause(s.match,600000);
+ const a=app(s),before=JSON.stringify(a.stored());a.run("actions['suggest-subs']()");assert.match(a.element('#dialog-content').innerHTML,/Wissels bevestigen/);assert.equal(JSON.stringify(a.stored()),before);
+ await a.emit('submit',{id:'substitution-form',data:{'in0':'g','position0':'5','in1':'h','position1':'1'}});
+ assert.equal(a.stored().match.lineup[5],'g');assert.equal(a.stored().match.lineup[1],'h');assert.equal(a.stored().match.lineup[0],'a');assert.equal(a.stored().undoHistory.length,1);
+ a.run('actions.undo()');assert.deepEqual(a.stored().match.lineup,s.match.lineup);
+});
+test('rust opent vrijblijvend keepervoorstel en bewaarde wedstrijd toont minuten en totalen',async()=>{
+ const s=model.freshState();s.players='abcdefg'.split('').map(id=>({id,name:id,present:true}));model.setLineup(s.match,'abcdef'.split(''));model.start(s.match,0);model.pause(s.match,1500000);
+ const a=app(s);a.run("actions['confirm-half']()");assert.equal(a.stored().match.half,2);assert.equal(a.stored().match.lineup[0],'a');assert.match(a.element('#dialog-content').innerHTML,/Keeper voor de tweede helft/);
+ await a.emit('submit',{id:'substitution-form',data:{in0:'g',position0:'0'}});assert.equal(a.stored().match.lineup[0],'g');
+ a.run("actions['confirm-finish']()");assert.equal(a.stored().history[0].players[0].present,true);
+ a.run(`actions.history({dataset:{id:'${s.match.id}'}})`);assert.match(a.element('#dialog-content').innerHTML,/Speeltijd deze wedstrijd/);assert.match(a.element('#dialog-content').innerHTML,/25:00/);
+ a.run("dialog.close();tab='team';render()");assert.match(a.element('#app').innerHTML,/Totale speeltijd/);assert.match(a.element('#app').innerHTML,/Gemiddeld/);
 });

@@ -1,5 +1,5 @@
-const CACHE='zijlijn-v1.6.0';
-const ASSETS=['./','./index.html','./styles.css','./app.js','./model.js','./training.js','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
+const CACHE='zijlijn-v1.7.0';
+const ASSETS=['./','./index.html','./styles.css','./app.js','./model.js','./coaching.js','./training.js','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS.map(path=>new Request(path,{cache:'reload'})))));});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('zijlijn-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
 self.addEventListener('message',e=>{if(e.data?.type==='ACTIVATE_UPDATE')e.waitUntil(self.skipWaiting());});

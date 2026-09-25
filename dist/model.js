@@ -89,7 +89,7 @@ export function validateState(s) {
   if(!s||s.version!==1||!Array.isArray(s.players)||s.players.length>100||!Array.isArray(s.history)||s.history.length>1000) fail();
   s.teamUrl=normalizeTeamUrl(s.teamUrl===undefined?'':s.teamUrl);
   const ids=new Set();
-  for(const p of s.players) {if(!p||!str(p.id)||!str(p.name)||!p.name.trim()||typeof p.present!=='boolean'||ids.has(p.id))fail();ids.add(p.id);}
+  for(const p of s.players) {if(p?.preferredLine!==undefined&&!['any','defence','midfield','attack'].includes(p.preferredLine))fail();if(!p||!str(p.id)||!str(p.name)||!p.name.trim()||typeof p.present!=='boolean'||ids.has(p.id))fail();ids.add(p.id);}
   const line=(l,known)=>Array.isArray(l)&&l.length===6&&l.every(v=>v===null||(str(v)&&(!known||ids.has(v))))&&new Set(l.filter(Boolean)).size===l.filter(Boolean).length;
   function match(m,known) {
     if(!m||!str(m.id)||!str(m.opponent)||!str(m.date)||typeof m.home!=='boolean'||!Number.isInteger(m.halfMinutes)||m.halfMinutes<1||m.halfMinutes>60||![1,2].includes(m.half)||!num(m.elapsed)||!(m.startedAt===null||num(m.startedAt))||!['ready','live','ended'].includes(m.status)||!line(m.lineup,known)||!line(m.initialLineup,known)||!Array.isArray(m.events)||m.events.length>10000)fail();
@@ -117,7 +117,7 @@ export function validateState(s) {
   const trainingIds=new Set();for(const t of s.trainings){validateTraining(t);if(trainingIds.has(t.id))fail();trainingIds.add(t.id);}
   if(s.trainings.filter(t=>t.run.status==='live').length>1)fail();
   if(s.selectedTrainingId&&!trainingIds.has(s.selectedTrainingId))s.selectedTrainingId='';
-  for(const h of s.history){match(h.match,false);if(h.match.status!=='ended'||!Array.isArray(h.players)||h.players.some(p=>!p||!str(p.id)||!str(p.name)))fail();const roster=new Set(h.players.map(p=>p.id));if(h.match.events.some(e=>e.type==='goal'&&e.scorerId&&!roster.has(e.scorerId)))fail();}
+  for(const h of s.history){match(h.match,false);if(h.match.status!=='ended'||!Array.isArray(h.players)||h.players.some(p=>!p||!str(p.id)||!str(p.name)||(p.present!==undefined&&typeof p.present!=='boolean')))fail();const roster=new Set(h.players.map(p=>p.id));if(h.match.events.some(e=>e.type==='goal'&&e.scorerId&&!roster.has(e.scorerId)))fail();}
   return s;
 }
 
