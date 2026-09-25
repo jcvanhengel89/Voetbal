@@ -39,6 +39,15 @@ export function topScorers(s) {
   matches.set(s.match.id,s.match);
   return countScorers([...matches.values()],[...players.values()]);
 }
+// Remove the finished current copy too, so deleted goals cannot keep counting.
+export function deleteHistory(s,id) {
+ const index=s.history.findIndex(h=>h.match.id===id);
+ if(index<0||(s.match.id===id&&s.match.status!=='ended'))return false;
+ s.history.splice(index,1);
+ if(s.match.id===id){s.match=freshMatch();s.undoHistory=[];}
+ s.backupMatches=Math.min(Math.max(0,s.backupMatches-(index<s.backupMatches?1:0)),s.history.length);
+ return true;
+}
 export function minutes(m, now=Date.now()) {
   const total=elapsed(m,now), result={}; let previous=0, lineup=m.initialLineup;
   const add = until => { for(const id of lineup) if(id) result[id]=(result[id]||0)+Math.max(0,until-previous); previous=until; };

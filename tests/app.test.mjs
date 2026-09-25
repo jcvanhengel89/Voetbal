@@ -150,3 +150,43 @@ test('voorbespreking blijft bovenop na asynchroon openen van native fullscreen',
  a.run('document.documentElement.requestFullscreen=async()=>{document.fullscreenElement=document.documentElement}');
  await a.run("actions['show-lineup']()");assert.deepEqual(order,['dialog','dialog']);assert.equal(d.open,true);assert.equal(a.run('presentationOpen'),true);
 });
+
+test('historie verwijderen vraagt bevestiging en past topscorers blijvend aan',()=>{
+ const s=model.freshState();s.players=[{id:'a',name:'Ali',present:true}];
+ const past=model.freshMatch();past.status='ended';past.opponent='Testclub';past.events=[{id:'g',type:'goal',side:'us',at:0,scorerId:'a'}];s.history=[{match:past,players:s.players}];
+ const a=app(s,'#team'),before=JSON.stringify(a.stored());
+ a.run(`actions.history({dataset:{id:'${past.id}'}})`);assert.match(a.element('#dialog-content').innerHTML,/Wedstrijd verwijderen/);
+ a.run(`actions['delete-history']({dataset:{id:'${past.id}'}})`);assert.match(a.element('#dialog-content').innerHTML,/Testclub/);assert.equal(JSON.stringify(a.stored()),before);
+ a.run('actions.close()');assert.equal(JSON.stringify(a.stored()),before);
+ a.run(`actions['delete-history']({dataset:{id:'${past.id}'}});actions['confirm-delete-history']({dataset:{id:'${past.id}'}})`);
+ assert.equal(a.stored().history.length,0);assert.equal(model.topScorers(a.stored()).players.length,0);assert.deepEqual(a.stored().match,s.match);
+ const reload=app(a.stored());assert.equal(reload.stored().history.length,0);model.validateState(reload.stored());
+});
+test('laatst afgeronde wedstrijd verwijderen wist ook de huidige kopie en herstelacties',()=>{
+ const s=model.freshState();s.players=[{id:'a',name:'Ali',present:true}];s.match.status='ended';s.match.events=[{id:'g',type:'goal',side:'us',at:0,scorerId:'a'}];s.history=[{match:structuredClone(s.match),players:s.players}];
+ const a=app(s,'#team');a.run("actions['minus-us']()");assert.equal(a.stored().undoHistory.length,1);
+ a.run(`actions['delete-history']({dataset:{id:'${s.match.id}'}})`);assert.match(a.element('#dialog-content').innerHTML,/wedstrijdscherm/);
+ a.run(`actions['confirm-delete-history']({dataset:{id:'${s.match.id}'}});actions.undo()`);
+ assert.equal(a.stored().history.length,0);assert.equal(a.stored().match.status,'ready');assert.notEqual(a.stored().match.id,s.match.id);assert.equal(a.stored().undoHistory.length,0);assert.equal(model.topScorers(a.stored()).players.length,0);assert.deepEqual(a.stored().players,s.players);model.validateState(a.stored());
+});
+test('oude historie verwijderen raakt lopende wedstrijd en training niet',()=>{
+ const s=model.freshState();s.match.status='live';s.match.startedAt=Date.now();const old=model.freshMatch();old.status='ended';s.history=[{match:old,players:[]}];
+ const t=training.createTraining({date:'2026-09-25',links:['https://rinus.knvb.nl/exercise/id/1','https://rinus.knvb.nl/exercise/id/2','https://rinus.knvb.nl/exercise/id/3','']});s.trainings=[t];
+ const a=app(s);a.run(`actions['confirm-delete-history']({dataset:{id:'${old.id}'}})`);assert.deepEqual(a.stored().match,s.match);assert.deepEqual(a.stored().trainings,s.trainings);
+ const before=JSON.stringify(a.stored());a.run(`actions['confirm-delete-history']({dataset:{id:'${old.id}'}})`);assert.equal(JSON.stringify(a.stored()),before);
+});
+test('wedstrijdscherm houdt score en bankwissels direct bereikbaar zonder tweede opstelling',()=>{
+ const s=model.freshState();s.players=[{id:'a',name:'Ali',present:true},{id:'b',name:'Bo',present:true}];s.match.lineup[0]='a';s.match.initialLineup[0]='a';s.match.status='live';s.match.half=2;
+ const a=app(s),html=a.element('#app').innerHTML;
+ assert.doesNotMatch(html,/data-action="position"|id="formation"|Speeltijd per speler/);assert.match(html,/data-action="bench"/);assert.equal((html.match(/data-action="finish"/g)||[]).length,1);
+ a.run("actions.bench({dataset:{id:'b'}});actions.assign({dataset:{index:'0',id:'b'}})");assert.equal(a.stored().match.lineup[0],'b');
+ a.run("actions['goal-them']()");assert.equal(model.score(a.stored().match).them,1);
+ a.run("tab='opstelling';render()");assert.match(a.element('#app').innerHTML,/data-action="position"/);assert.match(a.element('#app').innerHTML,/Speeltijd per speler/);
+});
+test('historie verwijderen houdt de grens tussen geback-upte en nieuwe wedstrijden correct',()=>{
+ for(const index of [0,5]){
+  const s=model.freshState();s.backupAt=Date.now();s.backupMatches=3;s.history=Array.from({length:6},()=>({match:{...model.freshMatch(),status:'ended'},players:[]}));
+  assert.equal(model.backupDue(s),true);model.deleteHistory(s,s.history[index].match.id);
+  assert.equal(s.backupMatches,index===0?2:3);assert.equal(model.backupDue(s),index===0);
+ }
+});

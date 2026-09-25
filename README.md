@@ -119,3 +119,10 @@ Offline-updates halen alle appbestanden opnieuw op met cache-revalidatie. Bij ee
 Een rustige lichte vormgeving, blauwe accenten en zwevende glasnavigatie. Via **Opstelling tonen** verschijnt een alleen-lezen veld over het hele scherm, met grote namen en de wisselbank. Liggend op de telefoon draait de speelrichting mee naar links-rechts. De app vraagt waar ondersteund om volledig scherm en houdt het scherm wakker zolang de voorbespreking open is. Sluit met het kruisje; scores, timers en opstelling veranderen niet.
 
 Versie 1.5.1 houdt het presentatieveld boven de pagina wanneer de browser naar volledig scherm schakelt.
+
+### Versie 1.6.0 — rustiger wedstrijdscherm en historie opruimen
+
+- Wedstrijd toont score, klok en direct wisselen vanaf de bank. Het veld, formatie en speeltijden staan op Opstelling.
+- Notities, samenvatting en verloop staan onder Verslag & samenvatting; na afronden opent dit vanzelf.
+- Vorige wedstrijden: open een wedstrijd via Mijn team en kies Wedstrijd verwijderen. Na bevestiging vervallen ook de goals in de topscorers. Als dit de laatst afgeronde wedstrijd op het wedstrijdscherm is, wordt dat scherm klaargezet voor een nieuwe wedstrijd. Team en trainingen blijven behouden. Verwijderen is definitief, tenzij je een eerdere back-up terugzet.
+- Datum/tijd en overige formuliervelden zijn begrensd tot de beschikbare breedte, inclusief de minimale breedte van native mobiele datumvelden.
