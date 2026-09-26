@@ -143,3 +143,8 @@ Versie 1.5.1 houdt het presentatieveld boven de pagina wanneer de browser naar v
 - Handmatig wisselen via veldposities en grijze wisselbank; totale wedstrijdminuten zichtbaar.
 - Thuis-uitvolgorde op scorebord, historie en samenvatting; Nieuwerkerk lichtrood gemarkeerd.
 - Ruimere historieknoppen en expliciet gewonnen/verloren/gelijkgespeeld in de samenvatting.
+
+
+## Versie 1.7.2
+- Historie toont inkomende en uitgaande spelers per wissel, met aparte aanduiding voor positieruilen.
+- Titel en sluitknop blijven zichtbaar tijdens scrollen in gewone dialoogvensters.

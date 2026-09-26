@@ -231,3 +231,9 @@ test('uituitslag in historie en samenvatting is thuis-uit met duidelijk resultaa
  a.run(`showHistory({dataset:{id:${JSON.stringify(s.match.id)}}})`);assert.match(a.element('#dialog-content').innerHTML,/VOC 2 – 1 Nieuwerkerk/);
  const text=model.matchSummary(s.match);assert.match(text,/Eindstand: 2–1/);assert.match(text,/Verloren/);assert.doesNotMatch(text,/Nieuwerkerk eerst/);
 });
+test('historie toont erin en eruit voor dubbele wissel en herkent positieruil',()=>{
+ const s=model.freshState();s.players='abcdefgh'.split('').map(id=>({id,name:'Speler '+id,present:true}));model.setLineup(s.match,'abcdef'.split(''));model.start(s.match,0);model.pause(s.match,60000);
+ model.setLineup(s.match,['a','g','h','d','e','f'],60000);model.setLineup(s.match,['g','a','h','d','e','f'],60000);s.match.status='ended';s.history=[{match:structuredClone(s.match),players:structuredClone(s.players)}];
+ const a=app(s);a.run(`showHistory({dataset:{id:${JSON.stringify(s.match.id)}}})`);const html=a.element('#dialog-content').innerHTML;
+ assert.match(html,/Erin: Speler g, Speler h/);assert.match(html,/Eruit: Speler b, Speler c/);assert.match(html,/Posities gewisseld: Speler g, Speler a/);assert.doesNotMatch(html,/Opstelling: /);
+});

@@ -1,7 +1,7 @@
 import {PREFERRED_LINES,positionLine,playingStatistics,proposeSubstitutions,applySubstitutionProposal,needsKeeperChange} from './coaching.js';
 import {BLOCKS,nextTrainingDate,defaultStart,createTraining,schedule,trainingElapsed,startTraining,pauseTraining,nextBlock,trainingText} from './training.js';
 import {freshState,freshMatch,uid,elapsed,score,matchSides,minutes,start,pause,setLineup,setFormation,positionNames,FORMATIONS,normalizeTeamUrl,undo,validateState,removeGoal,matchSummary,changeGame,undoGame,reminders,backupDue,topScorers,deleteHistory} from './model.js';
-const APP_VERSION='1.7.1';
+const APP_VERSION='1.7.2';
 const KEY='zijlijn-v1', $=s=>document.querySelector(s), app=$('#app'), dialog=$('#dialog');
 let state=freshState(), storageError='', tab=location.hash.slice(1)||'wedstrijd', toastTimer, wakeLock=null, wakePending=false, presentationOpen=false, presentationFullscreen=false;
 let swRegistration, waitingWorker, updateCheck='Nog niet gecontroleerd', latestVersion='', lastUpdateCheck=0, checkingUpdate=false;
@@ -291,10 +291,16 @@ function confirmDeleteHistory(b){
  if(current&&state.match.status!=='ended')return;
  modal('Wedstrijd verwijderen',`<p><strong>${esc(matchSides(m)[0].name)} ${matchSides(m)[0].goals} – ${matchSides(m)[1].goals} ${esc(matchSides(m)[1].name)}</strong><br>${esc(dateLabel(m))}</p><p>Deze wedstrijd, het verslag en de bijbehorende doelpunten verdwijnen uit de historie en topscorers. Dit kun je niet ongedaan maken.</p>${current?'<p>Deze wedstrijd staat ook op het wedstrijdscherm. Dat wordt leeggemaakt voor de volgende wedstrijd. Je spelers en trainingen blijven bewaard.</p>':''}<div class="row"><button data-action="history" data-id="${esc(m.id)}">Annuleren</button><button class="danger" data-action="confirm-delete-history" data-id="${esc(m.id)}">Verwijderen</button></div>`);
 }
+function historySubstitution(e,player){
+ const incoming=e.lineup.filter(id=>id&&!e.before.includes(id)),out=e.before.filter(id=>id&&!e.lineup.includes(id));
+ if(incoming.length||out.length)return ['Wissel',incoming.length?'Erin: '+incoming.map(player).join(', '):'',out.length?'Eruit: '+out.map(player).join(', '):''].filter(Boolean).join(' · ');
+ const moved=e.lineup.filter((id,i)=>id&&id!==e.before[i]);
+ return moved.length?'Posities gewisseld: '+moved.map(player).join(', '):'Opstelling ongewijzigd';
+}
 function showHistory(b){
  const h=state.history.find(h=>h.match.id===b.dataset.id);if(!h)return;
  const m=h.match,s=score(m),times=minutes(m),player=id=>h.players.find(p=>p.id===id)?.name||'Onbekende speler';
- const events=m.events.map(e=>e.type==='goal'?`Doelpunt ${e.side==='us'?'Nieuwerkerk'+(e.scorerId?' · '+player(e.scorerId):''):m.opponent||'tegenstander'}`:e.type==='formation'?`Formatie ${e.beforeFormation} → ${e.formation}`:`Opstelling: ${e.lineup.filter(Boolean).map(player).join(', ')}`);
+ const events=m.events.map(e=>e.type==='goal'?`Doelpunt ${e.side==='us'?'Nieuwerkerk'+(e.scorerId?' · '+player(e.scorerId):''):m.opponent||'tegenstander'}`:e.type==='formation'?`Formatie ${e.beforeFormation} → ${e.formation}`:historySubstitution(e,player));
  modal('Wedstrijd terugkijken',`<p class="eyebrow">${esc(dateLabel(m))}</p><h3>${esc(matchSides(m)[0].name)} ${matchSides(m)[0].goals} – ${matchSides(m)[1].goals} ${esc(matchSides(m)[1].name)}</h3><p class="muted small">${m.home?'Thuis':'Uit'} · ${clock(elapsed(m))} gespeeld</p>${historyScorers(m)}${historyPlayingTimes(h)}<details><summary>Eindopstelling · ${m.formation}</summary>${m.lineup.map((id,i)=>`<div class="history-row"><span>${positionNames(m)[i]}</span><strong>${esc(id?player(id):'Lege plek')}</strong></div>`).join('')}</details><details><summary>Wissels & doelpunten</summary><ol class="timeline">${m.events.map((e,i)=>`<li><time>${clock(e.at)}</time><span>${esc(events[i])}</span></li>`).join('')}</ol></details>${m.notes?`<p class="preserve-lines">${esc(m.notes)}</p>`:''}<button class="wide" data-action="summary" data-id="${esc(m.id)}">Samenvatting bekijken</button><button class="wide text-button danger" data-action="delete-history" data-id="${esc(m.id)}">Wedstrijd verwijderen</button>`);
 }
 Object.assign(actions,{

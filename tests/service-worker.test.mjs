@@ -9,7 +9,7 @@ test('versiecontrole passeert offline-cache, assets gebruiken eigen releasecache
  let response;
  handlers.fetch({request:{method:'GET',url:'https://example.test/Voetbal/release.json?t=123'},respondWith:()=>assert.fail('Release mag niet uit de offline-cache komen')});
  handlers.fetch({request:{method:'GET',url:'https://example.test/Voetbal/app.js'},respondWith:p=>response=p});
- assert.equal(await response,'cached asset');assert.deepEqual(calls,['zijlijn-v1.7.1']);
+ assert.equal(await response,'cached asset');assert.deepEqual(calls,['zijlijn-v1.7.2']);
 });
 test('een nieuwe worker activeert alleen op verzoek, niet tijdens installatie',async()=>{
  const handlers={};let activations=0;const requests=[];
