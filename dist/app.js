@@ -1,7 +1,7 @@
 import {PREFERRED_LINES,positionLine,playingStatistics,proposeSubstitutions,applySubstitutionProposal,needsKeeperChange} from './coaching.js';
 import {BLOCKS,nextTrainingDate,defaultStart,createTraining,schedule,trainingElapsed,startTraining,pauseTraining,nextBlock,trainingText} from './training.js';
 import {freshState,freshMatch,uid,elapsed,score,matchSides,minutes,start,pause,setLineup,setFormation,positionNames,FORMATIONS,normalizeTeamUrl,undo,validateState,removeGoal,matchSummary,changeGame,undoGame,reminders,backupDue,topScorers,deleteHistory} from './model.js';
-const APP_VERSION='1.7.2';
+const APP_VERSION='1.7.3';
 const KEY='zijlijn-v1', $=s=>document.querySelector(s), app=$('#app'), dialog=$('#dialog');
 let state=freshState(), storageError='', tab=location.hash.slice(1)||'wedstrijd', toastTimer, wakeLock=null, wakePending=false, presentationOpen=false, presentationFullscreen=false;
 let swRegistration, waitingWorker, updateCheck='Nog niet gecontroleerd', latestVersion='', lastUpdateCheck=0, checkingUpdate=false;
