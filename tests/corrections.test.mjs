@@ -14,7 +14,7 @@ test('samenvatting onderscheidt tussenstand en eindstand en volgt correcties',()
  const m=freshMatch();m.opponent='Testclub';m.home=false;
  assert.match(matchSummary(m),/uit bij Testclub/);assert.doesNotMatch(matchSummary(m),/Eindstand/);
  start(m,0);m.events.push({id:'g',type:'goal',side:'us',at:1000});pause(m,2000);
- assert.match(matchSummary(m),/Tussenstand: 1–0/);
+ assert.match(matchSummary(m),/Tussenstand: 0–1/);
  m.status='ended';assert.match(matchSummary(m),/Gewonnen/);
- removeGoal(m,'us');assert.match(matchSummary(m),/Eindstand: 0–0/);assert.match(matchSummary(m),/gelijkspel/);
+ removeGoal(m,'us');assert.match(matchSummary(m),/Eindstand: 0–0/);assert.match(matchSummary(m),/Gelijkgespeeld/);
 });

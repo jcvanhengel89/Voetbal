@@ -68,3 +68,26 @@ test('aanwezigheid in nieuwe archieven wordt gevalideerd terwijl oude archieven 
  const s=fixture();s.match.status='ended';s.history=[{match:structuredClone(s.match),players:[{id:'a',name:'a'}]}];validateState(s);
  s.history[0].players[0].present='ja';assert.throws(()=>validateState(s));
 });
+test('beide bankspelers wisselen mee, ook wanneer tweede evenveel minuten heeft',()=>{
+ const s=fixture();setLineup(s.match,['a','g','c','d','e','f'],600000);
+ start(s.match,600000);pause(s.match,660000);
+ // b heeft 10 minuten, h 0; overige veldspelers 11. Na 1 minuut beiden beschikbaar.
+ let p=coaching.proposeSubstitutions(s,{now:660000});assert.equal(p.changes.length,2);
+ coaching.applySubstitutionProposal(s,p,660000);
+ start(s.match,660000);pause(s.match,720000);
+ // Een groepswissel mag ook zonder individueel minuutvoordeel voor ieder kind.
+ p=coaching.proposeSubstitutions(s,{now:720000});assert.equal(p.changes.length,2);
+ coaching.applySubstitutionProposal(s,p,720000);assert.equal(coaching.proposeSubstitutions(s,{now:720000}).changes.length,0);
+});
+test('bankspeler met evenveel keeperminuten blijft in dubbel voorstel',()=>{
+ const s=fixture();
+ s.match.initialLineup=['g','b',null,null,null,'f'];
+ s.match.events=[
+  {id:'swap',type:'lineup',at:60000,before:['g','b',null,null,null,'f'],lineup:['g','a','c','d','e','h']},
+  {id:'keeper',type:'lineup',at:570000,before:['g','a','c','d','e','h'],lineup:['a','b','c','d','e','f']}
+ ];
+ s.match.lineup=['a','b','c','d','e','f'];s.match.elapsed=630000;
+ // g: 9:30 keepen; h: 8:30 veld; c/d/e: 9:30 veld. Oude regel koos alleen h.
+ const p=coaching.proposeSubstitutions(s,{now:630000});assert.equal(p.changes.length,2);
+ assert.deepEqual(p.changes.map(x=>x.inId),['h','g']);
+});

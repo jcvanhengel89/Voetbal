@@ -136,3 +136,10 @@ Versie 1.5.1 houdt het presentatieveld boven de pagina wanneer de browser naar v
 - Historie toont Speeltijd deze wedstrijd direct geopend, inclusief keepen. Nieuwe archieven bewaren ook aanwezigheid, zodat nul gespeelde minuten te onderscheiden zijn van afwezigheid. Oude wedstrijden tonen geen verzonnen aanwezigheid.
 - Mijn team → Totale speeltijd: totale minuten, aantal aanwezige wedstrijden, gemiddelde en minuten van de laatst bewaarde wedstrijd. Alleen afgeronde wedstrijden tellen mee, precies eenmaal; verwijderen werkt direct door. Bij oudere gegevens zonder aanwezigheid telt voor het gemiddelde alleen geregistreerde deelname.
 - Alle tijden zijn min:sec (ook totalen boven een uur). Suggesties gebruiken huidige wedstrijdminuten; historische totalen zijn ter informatie bij voorbereiding, zodat afwezigheid niet automatisch wordt gecompenseerd.
+
+
+## Versie 1.7.1
+- Wisselvoorstel roteert beide bankspelers, met minimaal één speelminuut per beurt ter voorkoming van direct terugwisselen. Speeltijd bepaalt prioriteit, keeper blijft staan.
+- Handmatig wisselen via veldposities en grijze wisselbank; totale wedstrijdminuten zichtbaar.
+- Thuis-uitvolgorde op scorebord, historie en samenvatting; Nieuwerkerk lichtrood gemarkeerd.
+- Ruimere historieknoppen en expliciet gewonnen/verloren/gelijkgespeeld in de samenvatting.

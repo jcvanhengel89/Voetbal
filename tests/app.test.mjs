@@ -212,3 +212,22 @@ test('rust opent vrijblijvend keepervoorstel en bewaarde wedstrijd toont minuten
  a.run(`actions.history({dataset:{id:'${s.match.id}'}})`);assert.match(a.element('#dialog-content').innerHTML,/Speeltijd deze wedstrijd/);assert.match(a.element('#dialog-content').innerHTML,/25:00/);
  a.run("dialog.close();tab='team';render()");assert.match(a.element('#app').innerHTML,/Totale speeltijd/);assert.match(a.element('#app').innerHTML,/Gemiddeld/);
 });
+test('uitwedstrijd zet tegenstander links en houdt doelpuntacties bij het juiste team',()=>{
+ const s=model.freshState();s.match.home=false;s.match.opponent='VOC';s.match.status='live';
+ const a=app(s);let html=a.element('#app').innerHTML;
+ assert.ok(html.indexOf('data-action="goal-them"')<html.indexOf('data-action="goal-us"'));assert.match(html,/score-team our-team/);
+ a.run("actions['goal-us']()");assert.equal(model.score(a.stored().match).us,1);
+});
+test('visueel wisselen toont veldposities en grijze bank met minuten in beide richtingen',()=>{
+ const s=model.freshState();s.players='abcdefgh'.split('').map(id=>({id,name:id,present:true}));model.setLineup(s.match,'abcdef'.split(''));s.match.status='live';s.match.elapsed=600000;
+ const a=app(s);a.run('choosePosition(1)');let html=a.element('#dialog-content').innerHTML;
+ assert.match(html,/swap-pitch/);assert.match(html,/swap-bench/);assert.match(html,/10:00/);assert.match(html,/data-index="1" data-id="g"/);
+ a.run("actions.bench({dataset:{id:'g'}})");html=a.element('#dialog-content').innerHTML;assert.match(html,/swap-pitch/);assert.match(html,/data-index="2" data-id="g"/);
+ a.run("assign(2,'g')");assert.equal(a.stored().match.lineup[2],'g');assert.equal(model.minutes(a.stored().match).c,600000);
+});
+test('uituitslag in historie en samenvatting is thuis-uit met duidelijk resultaat',()=>{
+ const s=model.freshState();Object.assign(s.match,{home:false,opponent:'VOC',status:'ended',events:[{id:'g1',type:'goal',side:'us',at:0},{id:'g2',type:'goal',side:'them',at:0},{id:'g3',type:'goal',side:'them',at:0}]});s.history=[{match:structuredClone(s.match),players:[]}];
+ const a=app(s,'#team');assert.match(a.element('#app').innerHTML,/2 – 1/);
+ a.run(`showHistory({dataset:{id:${JSON.stringify(s.match.id)}}})`);assert.match(a.element('#dialog-content').innerHTML,/VOC 2 – 1 Nieuwerkerk/);
+ const text=model.matchSummary(s.match);assert.match(text,/Eindstand: 2–1/);assert.match(text,/Verloren/);assert.doesNotMatch(text,/Nieuwerkerk eerst/);
+});

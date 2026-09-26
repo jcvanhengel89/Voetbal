@@ -45,11 +45,13 @@ export function proposeSubstitutions(s,{count=2,keeper=false,now=Date.now()}={})
   const candidates=players.filter(x=>x.id!==m.lineup[0]).sort((a,b)=>(time[a.id]||0)-(time[b.id]||0)||(byLine[a.id]?.keeper||0)-(byLine[b.id]?.keeper||0)||least(a,b));
   if(candidates[0])p.changes.push({index:0,outId:m.lineup[0],inId:candidates[0].id});return p;
  }
- const waiting=players.filter(x=>!m.lineup.includes(x.id)).sort(least),used=new Set();
+ const end=elapsed(m,now);
+ const lastEntry=id=>m.events.filter(e=>e.type==='lineup'&&!e.before.includes(id)&&e.lineup.includes(id)).at(-1)?.at||0;
+ const waiting=players.filter(x=>!m.lineup.includes(x.id)&&end-lastExit(x.id)>=60000).sort(least),used=new Set();
  for(const incoming of waiting.slice(0,Math.max(1,Math.min(2,count)))){
   let slots=m.lineup.map((id,index)=>({id,index,time:id?(time[id]||0):Infinity})).filter(x=>x.index>0&&!used.has(x.index));
-  // Do not immediately swap back: require at least one minute's advantage.
-  slots=slots.filter(x=>!x.id||x.time-(time[incoming.id]||0)>=60000);if(!slots.length)continue;
+  // Rotate the whole bench; avoid immediately reversing a substitution.
+  slots=slots.filter(x=>!x.id||end-lastEntry(x.id)>=60000);if(!slots.length)continue;
   const max=Math.max(...slots.map(x=>x.time));slots=slots.filter(x=>max===Infinity?!x.id:x.time>=max-60000);
   const fit=x=>{const line=positionLine(m.formation,x.index);return (byLine[incoming.id]?.[line]||0)/300000-(incoming.preferredLine===line?1:0);};
   // Preference is worth five minutes of familiarity; variety can outweigh it.

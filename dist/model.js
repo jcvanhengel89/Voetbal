@@ -128,15 +128,19 @@ export function removeGoal(m, side) {
   if(index<0)return false;
   m.events.splice(index,1);return true;
 }
+export function matchSides(m){
+ const s=score(m),us={side:'us',name:'Nieuwerkerk JO10-8',goals:s.us},them={side:'them',name:m.opponent||'Tegenstander',goals:s.them};
+ return m.home?[us,them]:[them,us];
+}
 export function matchSummary(m,players=[]) {
-  const s=score(m), opponent=m.opponent||'de tegenstander';
+  const s=score(m), opponent=m.opponent||'de tegenstander',sides=matchSides(m);
   const fixture=`Nieuwerkerk JO10-8 ${m.home?'thuis tegen':'uit bij'} ${opponent}`;
   if(m.status==='ready')return `⚽ ${fixture}\n\nWe zijn klaar voor de wedstrijd! Kom je ons aanmoedigen? 💚`;
   const result=m.status==='ended'
-    ? s.us>s.them?'Gewonnen! 🎉':s.us===s.them?'Een gelijkspel! 🤝':'Op naar de volgende wedstrijd! 💪'
+    ? s.us>s.them?'Gewonnen! 🎉':s.us===s.them?'Gelijkgespeeld! 🤝':'Verloren. Op naar de volgende wedstrijd! 💪'
     :'Een update vanaf de zijlijn! 📣';
   const makers=goalScorers(m,players),goals=makers.players.length?`\n\nDoelpuntenmakers: ${makers.players.map(p=>`${p.name} (${p.goals})`).join(', ')}.${makers.unknown?` Nog zonder naam: ${makers.unknown}.`:''}`:'';
-  return `⚽ ${fixture}\n\n${m.status==='ended'?'Eindstand':'Tussenstand'}: ${s.us}–${s.them} (Nieuwerkerk eerst).\n${result}${goals}\n\n${m.status==='ended'?'Bedankt voor het aanmoedigen, ouders en supporters!':'Moedig je mee aan?'} 💚`;
+  return `⚽ ${fixture}\n\n${m.status==='ended'?'Eindstand':'Tussenstand'}: ${sides[0].goals}–${sides[1].goals}.\n${result}${goals}\n\n${m.status==='ended'?'Bedankt voor het aanmoedigen, ouders en supporters!':'Moedig je mee aan?'} 💚`;
 }
 
 const GAME_KEYS=['lineup','initialLineup','formation','initialFormation','events','half','halfStartedAt','timeouts','swapSnoozeAt'];
