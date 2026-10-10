@@ -85,14 +85,24 @@ export function undo(m) {
 export function validateState(s) {
   const fail=()=>{throw Error('Dit is geen geldige Zijlijn-back-up (versie 1).');};
   const str=v=>typeof v==='string' && v.length<=200;
+  const id=v=>str(v)&&!!v.trim();
   const num=v=>Number.isFinite(v)&&v>=0;
   if(!s||s.version!==1||!Array.isArray(s.players)||s.players.length>100||!Array.isArray(s.history)||s.history.length>1000) fail();
   s.teamUrl=normalizeTeamUrl(s.teamUrl===undefined?'':s.teamUrl);
-  const ids=new Set();
-  for(const p of s.players) {if(p?.preferredLine!==undefined&&!['any','defence','midfield','attack'].includes(p.preferredLine))fail();if(!p||!str(p.id)||!str(p.name)||!p.name.trim()||typeof p.present!=='boolean'||ids.has(p.id))fail();ids.add(p.id);}
-  const line=(l,known)=>Array.isArray(l)&&l.length===6&&l.every(v=>v===null||(str(v)&&(!known||ids.has(v))))&&new Set(l.filter(Boolean)).size===l.filter(Boolean).length;
-  function match(m,known) {
-    if(!m||!str(m.id)||!str(m.opponent)||!str(m.date)||typeof m.home!=='boolean'||!Number.isInteger(m.halfMinutes)||m.halfMinutes<1||m.halfMinutes>60||![1,2].includes(m.half)||!num(m.elapsed)||!(m.startedAt===null||num(m.startedAt))||!['ready','live','ended'].includes(m.status)||!line(m.lineup,known)||!line(m.initialLineup,known)||!Array.isArray(m.events)||m.events.length>10000)fail();
+  function roster(players,presentRequired) {
+    if(!Array.isArray(players))fail();
+    const ids=new Set();
+    for(const p of players) {
+      if(!p||!id(p.id)||!str(p.name)||!p.name.trim()||ids.has(p.id)||((presentRequired||p.present!==undefined)&&typeof p.present!=='boolean'))fail();
+      ids.add(p.id);
+    }
+    return ids;
+  }
+  const ids=roster(s.players,true);
+  for(const p of s.players)if(p.preferredLine!==undefined&&!['any','defence','midfield','attack'].includes(p.preferredLine))fail();
+  const line=(l,ids)=>Array.isArray(l)&&l.length===6&&l.every(v=>v===null||(id(v)&&ids.has(v)))&&new Set(l.filter(Boolean)).size===l.filter(Boolean).length;
+  function match(m,ids) {
+    if(!m||!id(m.id)||!str(m.opponent)||!str(m.date)||typeof m.home!=='boolean'||!Number.isInteger(m.halfMinutes)||m.halfMinutes<1||m.halfMinutes>60||![1,2].includes(m.half)||!num(m.elapsed)||!(m.startedAt===null||num(m.startedAt))||!['ready','live','ended'].includes(m.status)||!line(m.lineup,ids)||!line(m.initialLineup,ids)||!Array.isArray(m.events)||m.events.length>10000)fail();
     m.halfStartedAt??=m.half===2?Math.min(m.elapsed,m.halfMinutes*60000):0;
     m.timeouts??=[];m.swapSnoozeAt??=0;m.summary??='';m.summarySaved??=!!m.summary;m.notes??='';
     if(!num(m.halfStartedAt)||m.halfStartedAt>elapsed(m)+1000||!num(m.swapSnoozeAt)||!Array.isArray(m.timeouts)||m.timeouts.length>2||m.timeouts.some(v=>![1,2].includes(v))||typeof m.summarySaved!=='boolean'||typeof m.summary!=='string'||m.summary.length>10000||typeof m.notes!=='string'||m.notes.length>10000)fail();
@@ -100,9 +110,10 @@ export function validateState(s) {
     if(m.initialFormation===undefined)m.initialFormation='1-2-2-1';
     if(!Object.hasOwn(FORMATIONS,m.formation)||!Object.hasOwn(FORMATIONS,m.initialFormation))fail();
     let last=0, current=[...m.initialLineup], formation=m.initialFormation;
-    for(const e of m.events) {if(!e||!str(e.id)||!num(e.at)||e.at<last||e.at>elapsed(m)+1000)fail();last=e.at;
-      if(e.type==='goal'){if(!['us','them'].includes(e.side))fail();if(e.scorerId!==undefined&&e.scorerId!==null&&(!str(e.scorerId)||!e.scorerId||e.side!=='us'||(known&&!ids.has(e.scorerId))))fail();}
-      else if(e.type==='lineup'){if(!line(e.before,known)||!line(e.lineup,known)||JSON.stringify(e.before)!==JSON.stringify(current))fail();current=e.lineup;}
+    const eventIds=new Set();
+    for(const e of m.events) {if(!e||!id(e.id)||eventIds.has(e.id)||!num(e.at)||e.at<last||e.at>elapsed(m)+1000)fail();last=e.at;eventIds.add(e.id);
+      if(e.type==='goal'){if(!['us','them'].includes(e.side))fail();if(e.scorerId!==undefined&&e.scorerId!==null&&(!id(e.scorerId)||e.side!=='us'||!ids.has(e.scorerId)))fail();}
+      else if(e.type==='lineup'){if(!line(e.before,ids)||!line(e.lineup,ids)||JSON.stringify(e.before)!==JSON.stringify(current))fail();current=e.lineup;}
       else if(e.type==='formation'){if(e.beforeFormation!==formation||!Object.hasOwn(FORMATIONS,e.formation))fail();formation=e.formation;}
       else fail();
     }
@@ -110,14 +121,20 @@ export function validateState(s) {
     if(formation!==m.formation)fail();
     if(m.status!=='live'&&m.startedAt!==null)fail();
   }
-  match(s.match,true);
+  match(s.match,ids);
   s.undoHistory??=[];s.trainings??=[];s.selectedTrainingId??='';s.swapInterval??=0;s.backupAt??=0;s.backupMatches??=0;
   if(!Array.isArray(s.undoHistory)||s.undoHistory.length>20||!Array.isArray(s.trainings)||s.trainings.length>500||!str(s.selectedTrainingId)||!Number.isInteger(s.swapInterval)||s.swapInterval<0||s.swapInterval>60||!num(s.backupAt)||!Number.isInteger(s.backupMatches)||s.backupMatches<0)fail();
-  for(const u of s.undoHistory){if(!u||!str(u.label)||!u.before)fail();match({...s.match,...u.before},true);}
+  for(const u of s.undoHistory){if(!u||!str(u.label)||!u.before)fail();match({...s.match,...u.before},ids);}
   const trainingIds=new Set();for(const t of s.trainings){validateTraining(t);if(trainingIds.has(t.id))fail();trainingIds.add(t.id);}
   if(s.trainings.filter(t=>t.run.status==='live').length>1)fail();
   if(s.selectedTrainingId&&!trainingIds.has(s.selectedTrainingId))s.selectedTrainingId='';
-  for(const h of s.history){match(h.match,false);if(h.match.status!=='ended'||!Array.isArray(h.players)||h.players.some(p=>!p||!str(p.id)||!str(p.name)||(p.present!==undefined&&typeof p.present!=='boolean')))fail();const roster=new Set(h.players.map(p=>p.id));if(h.match.events.some(e=>e.type==='goal'&&e.scorerId&&!roster.has(e.scorerId)))fail();}
+  const historyIds=new Set();
+  for(const h of s.history){
+    if(!h)fail();
+    match(h.match,roster(h.players,false));
+    if(h.match.status!=='ended'||historyIds.has(h.match.id))fail();
+    historyIds.add(h.match.id);
+  }
   return s;
 }
 

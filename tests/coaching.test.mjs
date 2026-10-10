@@ -65,7 +65,7 @@ test('voorkeur kan een groter verschil in uitgaande speeltijd niet overstemmen',
  assert.equal(p.changes[0].inId,'g');assert.notEqual(p.changes[0].outId,'h');
 });
 test('aanwezigheid in nieuwe archieven wordt gevalideerd terwijl oude archieven geldig blijven',()=>{
- const s=fixture();s.match.status='ended';s.history=[{match:structuredClone(s.match),players:[{id:'a',name:'a'}]}];validateState(s);
+ const s=fixture();s.match.status='ended';s.history=[{match:structuredClone(s.match),players:s.players.map(({id,name})=>({id,name}))}];validateState(s);
  s.history[0].players[0].present='ja';assert.throws(()=>validateState(s));
 });
 test('beide bankspelers wisselen mee, ook wanneer tweede evenveel minuten heeft',()=>{

@@ -11,7 +11,7 @@ Een minimalistische webapp voor de teammanager langs de lijn. Geen account, serv
 5. Gebruik **Pauze** bij time-outs en rust. **2e helft** pauzeert de klok en wijzigt het helftnummer. Tik bij de hervatting op **Hervatten**. De grote klok toont de tijd in deze helft, met de totale gespeelde tijd eronder en stopt niet automatisch bij de richttijd.
 6. **Herstel: [actie]** zet de laatste wijziging terug, inclusief een verwijderd doelpunt, wissel, opstelling, formatie of helftwissel. De laatste twintig acties worden lokaal bewaard; aftrap, afronden en een nieuwe wedstrijd beginnen met een lege herstelgeschiedenis. Herstellen verandert de lopende klok niet. Een herstelde wissel corrigeert ook de speeltijd vanaf dat wisselmoment.
 7. **Wedstrijd afronden** stopt de klok en bewaart een momentopname. Daarna kun je een nieuwe wedstrijd beginnen.
-8. Bewaar regelmatig een JSON-back-up via **Mijn team**. Die is ook geschikt voor overzetten naar een ander toestel. Een teruggezette wedstrijd staat gepauzeerd op het moment van de export.
+8. Bewaar regelmatig een JSON-back-up via **Mijn team → Instellingen**. Die is ook geschikt voor overzetten naar een ander toestel. Een teruggezette wedstrijd staat gepauzeerd op het moment van de export.
 
 Tijdens een wedstrijd kun je wel spelers toevoegen of namen aanpassen. Aanwezigheid wijzigen en spelers verwijderen kan vóór de aftrap van de volgende wedstrijd. Een keeper telt net als de andere spelers mee in de speeltijd.
 
@@ -52,7 +52,7 @@ Open daarna `http://localhost:8080`. Open `index.html` niet rechtstreeks met `fi
 
 ## voetbal.nl en later uitbreiden
 
-De eerste versie heeft **geen automatische voetbal.nl-koppeling**. De tegenstander voer je handmatig in. Via **Mijn team → Teamlink instellen** kun je een geverifieerde link naar de JO10-8-teampagina bewaren. Zonder ingestelde teamlink opent de knop de algemene voetbal.nl-pagina. Er is nog geen specifieke teamlink vooraf ingevuld. Ondersteuning voor het openen van de native voetbal.nl-app hangt af van de aangeleverde HTTPS-link en je telefoon.
+De eerste versie heeft **geen automatische voetbal.nl-koppeling**. De tegenstander voer je handmatig in. Via **Mijn team → Instellingen → Teamlink** kun je een geverifieerde link naar de JO10-8-teampagina bewaren. Zonder ingestelde teamlink opent de knop de algemene voetbal.nl-pagina. Er is nog geen specifieke teamlink vooraf ingevuld. Ondersteuning voor het openen van de native voetbal.nl-app hangt af van de aangeleverde HTTPS-link en je telefoon.
 
 Sportlink biedt [Club.Dataservice](https://www.sportlink.nl/ons-aanbod/club-dataservice/) voor clubprogramma's en andere verenigingsgegevens. Of vv Nieuwerkerk de benodigde toegang heeft en gebruik in deze app is toegestaan, moet nog bij de club worden vastgesteld. Er zijn geen accounts, API-sleutels of niet-gedocumenteerde voetbal.nl-endpoints in deze app opgenomen.
 
@@ -148,3 +148,16 @@ Versie 1.5.1 houdt het presentatieveld boven de pagina wanneer de browser naar v
 ## Versie 1.7.3
 - Historie toont inkomende en uitgaande spelers per wissel, met aparte aanduiding voor positieruilen.
 - Titel en sluitknop blijven zichtbaar tijdens scrollen in gewone dialoogvensters.
+
+## Versie 1.8.0 — minimalistisch oranje en eerlijker wisselen
+
+- Een lichte neutrale achtergrond, donker scorebord en oranje actiekleur. Geen geneste kaartjes of schaduwen; alleen veld en score hebben een eigen oppervlak. Ons team blijft subtiel rood herkenbaar met een expliciet label.
+- Mijn team heeft Spelers, Statistieken en Historie. Voetbal.nl, herinneringen en back-ups staan onder Instellingen.
+- De wisselplanner berekent een richtwaarde uit aanwezige spelers, resterende wedstrijdtijd en keeperminuten. Bij acht aanwezige spelers en 50 minuten is dat 37:30; het advies toont ook wanneer je het beste kunt wisselen. De volgende keeper wordt voor de hele tweede helft meegerekend. Eigen keuzes blijven mogelijk; de planner berekent daarna opnieuw en signaleert wanneer exact gelijke minuten niet meer haalbaar zijn.
+- Een dynamisch wisseladvies verschijnt ook zonder vaste herinnering. Uitstellen kan met twee speelminuten; alle adviezen staan alleen in de geopende app. Vaste herinneringen zijn optionele extra meldingen.
+- Voorstellen tonen compact wie erin en eruit gaat, met gespeelde minuten. Keuzes aanpassen opent de bijbehorende velden.
+- Tijdelijke schrijffouten blokkeren geen latere opslag meer. Opnieuw opslaan bewaart de volledige actuele toestand. Onleesbare bestaande opslag blijft beschermd totdat expliciet een gecontroleerde back-up wordt teruggezet.
+- Back-ups worden ook gecontroleerd op complete historische selecties en unieke speler-, wedstrijd- en gebeurtenis-IDs. Oudere geldige gegevens zonder aanwezigheidsvelden blijven bruikbaar.
+- Opslag heeft een eigen module; belangrijke formulier-, import- en afrondacties hebben eigen functies. CSS gebruikt één palet en één definitie per component.
+
+Praktijkgrens: gelijke eindminuten zijn een richtwaarde, geen garantie bij andere handmatige wisselmomenten, afwijkende wedstrijdduur of een andere keeperkeuze. Tests doorlopen volledige wedstrijden met 7, 8 en 9 spelers en keeperwissel bij rust, inclusief pauzes.

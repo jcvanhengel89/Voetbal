@@ -36,23 +36,73 @@ export function needsKeeperChange(m){
  return !m.lineup[0]||m.lineup[0]===old;
 }
 const stamp=m=>JSON.stringify([m.id,m.half,m.formation,m.lineup,m.events.at(-1)?.id]);
+const MINUTE=60000;
+function rotationContext(s,now){
+ const m=s.match,at=elapsed(m,now),halfMs=m.halfMinutes*MINUTE;
+ const plannedDurationMs=m.half===2?m.halfStartedAt+halfMs:halfMs*2,remainingMs=Math.max(0,plannedDurationMs-at);
+ const present=s.players.filter(p=>p.present),time=minutes(m,now),byLine=lineMinutes(m,now);
+ let firstKeeperId=m.half===1?m.lineup[0]:m.initialLineup[0];
+ if(m.half===2)for(const e of m.events){if(e.at>=m.halfStartedAt)break;if(e.type==='lineup')firstKeeperId=e.lineup[0];}
+ const candidates=present.filter(p=>p.id!==firstKeeperId);
+ // Keep this recommendation stable throughout the first half. A child initially
+ // on the bench needs less field time because a full keeper half is reserved.
+ candidates.sort((a,b)=>Number(m.initialLineup.includes(a.id))-Number(m.initialLineup.includes(b.id))||a.name.localeCompare(b.name,'nl')||a.id.localeCompare(b.id));
+ const nextKeeperId=m.half===2&&!needsKeeperChange(m)?m.lineup[0]:candidates[0]?.id||null;
+ const targetMs=present.length?plannedDurationMs*Math.min(6,present.length)/present.length:0;
+ const lastExit=id=>m.events.filter(e=>e.type==='lineup'&&e.before.includes(id)&&!e.lineup.includes(id)).at(-1)?.at||0;
+ const lastEntry=id=>m.events.filter(e=>e.type==='lineup'&&!e.before.includes(id)&&e.lineup.includes(id)).at(-1)?.at||0;
+ const rows=present.map(p=>{
+  let reservedKeeperMs=0,availableFieldMs=remainingMs;
+  if(m.half===1){
+   if(p.id===m.lineup[0])reservedKeeperMs=Math.max(0,halfMs-at);
+   if(p.id===nextKeeperId)reservedKeeperMs+=Math.min(halfMs,remainingMs);
+  }else if(p.id===nextKeeperId)reservedKeeperMs=remainingMs;
+  reservedKeeperMs=Math.min(remainingMs,reservedKeeperMs);availableFieldMs-=reservedKeeperMs;
+  const actualMs=time[p.id]||0,remainingFieldMs=Math.max(0,targetMs-actualMs-reservedKeeperMs);
+  return {...p,actualMs,targetMs,reservedKeeperMs,remainingFieldMs,availableFieldMs,
+   slackMs:availableFieldMs-remainingFieldMs,urgency:availableFieldMs?remainingFieldMs/availableFieldMs:remainingFieldMs?Infinity:0,
+   eligibleAtMs:lastExit(p.id)+MINUTE,entryAtMs:lastEntry(p.id)+MINUTE};
+ });
+ return {at,plannedDurationMs,remainingMs,targetMs,rows,byLine,lastExit,lastEntry,nextKeeperId};
+}
+// Times are match-clock milliseconds: pausing never consumes the remaining plan.
+// Feasibility is a necessary per-player bound, not a promise after manual choices.
+export function playingTimePlan(s,{now=Date.now()}={}){
+ const m=s.match,c=rotationContext(s,now),bench=c.rows.filter(p=>!m.lineup.includes(p.id)&&p.remainingFieldMs>1);
+ const field=c.rows.filter(p=>m.lineup.slice(1).includes(p.id));
+ let nextSwapAtMs=null,status=m.status==='ended'||!c.remainingMs?'complete':'unavailable';
+ if(m.status==='live'&&c.remainingMs&&bench.length&&field.length){
+  // A bench player's slack is the latest possible entry that still allows its
+  // target. Leave one minute per additional batch when the bench exceeds two.
+  const benchDeadline=Math.min(...bench.map(p=>c.at+p.slackMs))-Math.max(0,Math.ceil(bench.length/2)-1)*MINUTE;
+  const deadline=Math.min(benchDeadline,...field.map(p=>c.at+p.remainingFieldMs));
+  const benchReady=Math.min(...bench.map(p=>p.eligibleAtMs)),fieldReady=Math.min(...field.map(p=>p.entryAtMs));
+  const lastBatch=m.events.filter(e=>e.type==='lineup'&&e.before[0]===e.lineup[0]&&e.before.some(id=>id&&!e.lineup.includes(id))).at(-1)?.at;
+  nextSwapAtMs=Math.max(c.at,deadline,benchReady,fieldReady,lastBatch===undefined?0:lastBatch+MINUTE);
+  if(nextSwapAtMs>=c.plannedDurationMs)nextSwapAtMs=null;
+  else status=nextSwapAtMs<=c.at+1?'due':'scheduled';
+ }
+ return {plannedDurationMs:c.plannedDurationMs,elapsedMs:c.at,remainingMs:c.remainingMs,targetMinutes:c.targetMs/MINUTE,
+  players:c.rows.map(({id,name,actualMs,targetMs,reservedKeeperMs,remainingFieldMs,availableFieldMs})=>({id,name,actualMs,targetMs,reservedKeeperMs,remainingFieldMs,availableFieldMs})),
+  keeper:{currentKeeperId:m.lineup[0],nextKeeperId:c.nextKeeperId,changeAtMs:m.half===1?m.halfMinutes*MINUTE:m.halfStartedAt,changeDue:needsKeeperChange(m)},
+  nextSwapAtMs,nextSwapInMs:nextSwapAtMs===null?null:Math.max(0,nextSwapAtMs-c.at),status,
+  equalityFeasible:c.rows.every(p=>p.actualMs+p.reservedKeeperMs<=c.targetMs+1&&p.remainingFieldMs<=p.availableFieldMs+1)};
+}
 export function proposeSubstitutions(s,{count=2,keeper=false,now=Date.now()}={}){
  const m=s.match,p={matchId:m.id,stamp:stamp(m),keeper,changes:[]};if(m.status!=='live'||keeper&&m.half!==2)return p;
- const time=minutes(m,now),byLine=lineMinutes(m,now),players=s.players.filter(x=>x.present);
- const lastExit=id=>m.events.filter(e=>e.type==='lineup'&&e.before.includes(id)&&!e.lineup.includes(id)).at(-1)?.at||0;
+ const context=rotationContext(s,now),{byLine,lastExit}=context,time=minutes(m,now),players=s.players.filter(x=>x.present);
  const least=(a,b)=>(time[a.id]||0)-(time[b.id]||0)||lastExit(a.id)-lastExit(b.id)||a.name.localeCompare(b.name,'nl');
  if(keeper){
-  const candidates=players.filter(x=>x.id!==m.lineup[0]).sort((a,b)=>(time[a.id]||0)-(time[b.id]||0)||(byLine[a.id]?.keeper||0)-(byLine[b.id]?.keeper||0)||least(a,b));
+  const candidates=players.filter(x=>x.id!==m.lineup[0]).sort((a,b)=>Number(b.id===context.nextKeeperId)-Number(a.id===context.nextKeeperId)||least(a,b));
   if(candidates[0])p.changes.push({index:0,outId:m.lineup[0],inId:candidates[0].id});return p;
  }
- const end=elapsed(m,now);
- const lastEntry=id=>m.events.filter(e=>e.type==='lineup'&&!e.before.includes(id)&&e.lineup.includes(id)).at(-1)?.at||0;
- const waiting=players.filter(x=>!m.lineup.includes(x.id)&&end-lastExit(x.id)>=60000).sort(least),used=new Set();
+ const end=context.at,rows=new Map(context.rows.map(p=>[p.id,p]));
+ const waiting=context.rows.filter(x=>!m.lineup.includes(x.id)&&end>=x.eligibleAtMs).sort((a,b)=>a.slackMs-b.slackMs||least(a,b)),used=new Set();
  for(const incoming of waiting.slice(0,Math.max(1,Math.min(2,count)))){
-  let slots=m.lineup.map((id,index)=>({id,index,time:id?(time[id]||0):Infinity})).filter(x=>x.index>0&&!used.has(x.index));
+  let slots=m.lineup.map((id,index)=>({id,index,time:id?(time[id]||0):Infinity,urgency:rows.get(id)?.urgency??-Infinity})).filter(x=>x.index>0&&!used.has(x.index));
   // Rotate the whole bench; avoid immediately reversing a substitution.
-  slots=slots.filter(x=>!x.id||end-lastEntry(x.id)>=60000);if(!slots.length)continue;
-  const max=Math.max(...slots.map(x=>x.time));slots=slots.filter(x=>max===Infinity?!x.id:x.time>=max-60000);
+  slots=slots.filter(x=>!x.id||end>=context.lastEntry(x.id)+MINUTE);if(!slots.length)continue;
+  const min=Math.min(...slots.map(x=>x.urgency));slots=slots.filter(x=>Math.abs(x.urgency-min)<1e-9||x.urgency===min);
   const fit=x=>{const line=positionLine(m.formation,x.index);return (byLine[incoming.id]?.[line]||0)/300000-(incoming.preferredLine===line?1:0);};
   // Preference is worth five minutes of familiarity; variety can outweigh it.
   slots.sort((a,b)=>fit(a)-fit(b)||b.time-a.time||a.index-b.index);

@@ -5,12 +5,14 @@ import {readFileSync} from 'node:fs';
 import * as model from '../dist/model.js';
 import * as training from '../dist/training.js';
 import * as coaching from '../dist/coaching.js';
+import * as persistence from '../dist/persistence.js';
 const code=readFileSync(new URL('../dist/app.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
 // A small DOM adapter exercises event handlers and persistence without a browser.
 function app(initial=model.freshState(),hash='',environment={}){
  const storage=new Map([['zijlijn-v1',JSON.stringify(initial)]]),elements=new Map(),handlers={};
  const element=selector=>{if(!elements.has(selector))elements.set(selector,{innerHTML:'',textContent:'',value:'',style:{},dataset:{},open:false,classList:{values:new Set(),add(v){this.values.add(v)},remove(v){this.values.delete(v)},contains(v){return this.values.has(v)}},listeners:{},addEventListener(t,f){(this.listeners[t]??=[]).push(f)},setAttribute(){},showModal(){this.open=true;},close(){this.open=false;queueMicrotask(()=>{for(const f of this.listeners.close||[])f();});},focus(){},click(){}});return elements.get(selector);};
- const context=vm.createContext({...model,...training,...coaching,console,URL,Blob,structuredClone,crypto,Date,JSON,Set,Map,FormData:class{constructor(form){this.data=form.data;}get(key){return this.data[key];}},navigator:{onLine:false},location:{hash},document:{documentElement:{},querySelector:element,querySelectorAll:()=>[],addEventListener:(type,fn)=>(handlers[type]??=[]).push(fn),visibilityState:'visible',createElement:()=>element('a')},window:{addEventListener(){}},localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},setTimeout:()=>0,clearTimeout(){},setInterval(){},fetch:async()=>{throw Error('offline');},...environment});
+ const context=vm.createContext({...model,...training,...coaching,...persistence,console,URL,Blob,structuredClone,crypto,Date,JSON,Set,Map,FormData:class{constructor(form){this.data=form.data;}get(key){return this.data[key];}},navigator:{onLine:false},location:{hash},document:{documentElement:{},querySelector:element,querySelectorAll:()=>[],addEventListener:(type,fn)=>(handlers[type]??=[]).push(fn),visibilityState:'visible',createElement:()=>element('a')},window:{addEventListener(){}},localStorage:{getItem:k=>storage.get(k),setItem:(k,v)=>storage.set(k,v)},setTimeout:()=>0,clearTimeout(){},setInterval(){},fetch:async()=>{throw Error('offline');},...environment});
+ environment.beforeBoot?.(context);
  vm.runInContext(code,context);
  return {run:s=>vm.runInContext(s,context),stored:()=>JSON.parse(storage.get('zijlijn-v1')),element,emit:async(type,target)=>{for(const h of handlers[type]||[])await h({target,preventDefault(){}});}};
 }
@@ -70,6 +72,51 @@ test('mislukte opslag blijft zichtbaar in plaats van een succesbericht',()=>{
  a.run("state.players.push({id:'a',name:'Test',present:true});assign(0,'a')");
  assert.match(a.element('#toast').textContent,/Opslaan lukt niet/);
  assert.match(a.element('#app').innerHTML,/Maak een back-up/);
+});
+test('tijdelijke opslagfout herstelt bij volgende wijziging zonder gegevensverlies',()=>{
+ let writable=false,saved=null;
+ const a=app(undefined,'',{localStorage:{getItem:()=>null,setItem(k,v){if(!writable)throw Error('quota');saved=v;}}});
+ a.run("state.players.push({id:'a',name:'Ali',present:true});update()");
+ assert.match(a.element('#app').innerHTML,/Opslaan lukt niet/);
+ writable=true;
+ a.run("state.players.push({id:'b',name:'Bo',present:true});update()");
+ assert.ok(saved,'alle wijzigingen moeten alsnog worden opgeslagen');
+ assert.deepEqual(JSON.parse(saved).players.map(p=>p.name),['Ali','Bo']);
+ assert.doesNotMatch(a.element('#app').innerHTML,/Opslaan lukt niet/);
+});
+test('opslagwaarschuwing biedt opnieuw opslaan en beschermt onleesbare originele opslag',()=>{
+ let writable=false,saved=null;
+ const a=app(undefined,'',{localStorage:{getItem:()=>null,setItem(k,v){if(!writable)throw Error('quota');saved=v;}}});
+ a.run("state.players.push({id:'a',name:'Ali',present:true});update()");
+ assert.match(a.element('#app').innerHTML,/data-action="retry-save"/);
+ writable=true;a.run("actions['retry-save']()");assert.equal(JSON.parse(saved).players[0].name,'Ali');
+ let writes=0;const broken=app(undefined,'',{localStorage:{getItem:()=>'{broken',setItem(){writes++;}}});
+ broken.run("state.players.push({id:'a',name:'Ali',present:true});save()");
+ assert.equal(writes,0);assert.doesNotMatch(broken.element('#app').innerHTML,/data-action="retry-save"/);
+});
+test('geblokkeerde browseropslag laat de app laden met een beschermde waarschuwing',()=>{
+ const a=app(undefined,'',{beforeBoot:context=>Object.defineProperty(context,'localStorage',{get(){throw Error('SecurityError');}})});
+ assert.match(a.element('#app').innerHTML,/opgeslagen gegevens konden niet worden geladen/);
+ assert.match(a.element('#app').innerHTML,/Wedstrijd/);
+ assert.doesNotMatch(a.element('#app').innerHTML,/data-action="retry-save"/);
+ a.run('save()');assert.match(a.run('storageError'),/konden niet worden geladen/);
+});
+test('team verdeelt spelers statistieken en historie en houdt instellingen uit het overzicht',()=>{
+ const a=app(undefined,'#team');const html=a.element('#app').innerHTML;
+ assert.match(html,/data-action="settings"/);
+ assert.match(html,/data-panel="history"/);assert.match(html,/data-panel="statistics"/);
+ assert.doesNotMatch(html,/Gegevens & back-up|Wisselherinnering/);
+ a.run("actions['team-panel']({dataset:{panel:'history'}})");
+ assert.match(a.element('#app').innerHTML,/id="team-history"[^>]*aria-label="Historie"/);
+ a.run('actions.settings()');assert.match(a.element('#dialog-content').innerHTML,/Back-up opslaan/);
+});
+test('dynamisch wisselmoment geeft ook zonder vaste herinnering een voorstel en kan worden uitgesteld',()=>{
+ const s=model.freshState();s.players='abcdefgh'.split('').map(id=>({id,name:id,present:true}));
+ model.setLineup(s.match,'abcdef'.split(''));model.start(s.match,0);model.pause(s.match,750000);
+ const a=app(s);assert.match(a.element('#match-reminders').innerHTML,/Wisseladvies/);
+ assert.match(a.element('#match-reminders').innerHTML,/data-action="suggest-subs"/);
+ a.run("actions['snooze-swap']()");assert.doesNotMatch(a.element('#match-reminders').innerHTML,/Wisseladvies/);
+ a.run('state.match.elapsed+=120000;tick()');assert.match(a.element('#match-reminders').innerHTML,/Wisseladvies/);
 });
 test('alle navigatieschermen renderen na herladen met training en wedstrijdgegevens',()=>{
  const s=model.freshState();const t=training.createTraining({date:'2026-09-18',links:['https://rinus.knvb.nl/exercise/id/1','https://rinus.knvb.nl/exercise/id/2','https://rinus.knvb.nl/exercise/id/3','']});s.trainings.push(t);s.selectedTrainingId=t.id;
