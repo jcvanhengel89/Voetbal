@@ -161,3 +161,7 @@ Versie 1.5.1 houdt het presentatieveld boven de pagina wanneer de browser naar v
 - Opslag heeft een eigen module; belangrijke formulier-, import- en afrondacties hebben eigen functies. CSS gebruikt één palet en één definitie per component.
 
 Praktijkgrens: gelijke eindminuten zijn een richtwaarde, geen garantie bij andere handmatige wisselmomenten, afwijkende wedstrijdduur of een andere keeperkeuze. Tests doorlopen volledige wedstrijden met 7, 8 en 9 spelers en keeperwissel bij rust, inclusief pauzes.
+
+## Versie 1.8.1 — controle aan de zijlijn
+
+[Lees de site-audit](docs/site-audit-2026-11-21.md) voor de bevindingen per scherm en de uitgevoerde controles. Belangrijkste wijzigingen: aftrapcheck bij een onvolledige opstelling, uitgelijnde scores bij lange clubnamen, behoud van een concepttraining bij tabwissels en beter herstel als lokaal opslaan niet lukt.

@@ -19,3 +19,13 @@ test('een nieuwe worker activeert alleen op verzoek, niet tijdens installatie',a
  handlers.install({waitUntil:p=>completion=p});await completion;assert.equal(activations,0);assert.ok(requests.some(r=>r.path==='./training.js'));assert.ok(requests.some(r=>r.path==='./persistence.js'));assert.ok(requests.every(r=>r.cache==='reload'));
  handlers.message({data:{type:'ACTIVATE_UPDATE'},waitUntil:p=>completion=p});await completion;assert.equal(activations,1);
 });
+test('een gedeelde app-link met query opent offline zonder onbekende pagina’s als wedstrijd te tonen',async()=>{
+ const handlers={},origin='https://example.test',root=origin+'/Voetbal/',cached={body:'offline shell'};
+ const cache={match:async(request,options)=>{const url=new URL(typeof request==='string'?request:request.url,root);if(options?.ignoreSearch)url.search='';return [root,root+'index.html'].includes(url.href)?cached:undefined;}};
+ vm.runInNewContext(code,{URL,self:{location:{href:root+'sw.js',origin},addEventListener:(t,f)=>handlers[t]=f},caches:{open:async()=>cache},fetch:async()=>{throw Error('offline');}});
+ const request=async(path,mode)=>{let response;handlers.fetch({request:{method:'GET',mode,url:root+path},respondWith:p=>response=p});return response;};
+ assert.equal(await request('?utm_source=ouders','navigate'),cached);
+ assert.equal(await request('index.html?from=app','navigate'),cached);
+ await assert.rejects(request('onbekend?from=app','navigate'),/offline/);
+ await assert.rejects(request('app.js?v=ander','cors'),/offline/);
+});

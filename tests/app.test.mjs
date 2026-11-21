@@ -139,7 +139,7 @@ test('naam achteraf in oud archief aanvullen behoudt score en nieuwe wedstrijd',
  a.run(`actions['edit-scorer']({dataset:{match:${JSON.stringify(past.id)},event:'g',history:'true'}});actions['assign-scorer']({dataset:{id:'old'}})`);
  const saved=a.stored();assert.equal(saved.history[0].match.events[0].scorerId,'old');assert.equal(saved.match.id,s.match.id);assert.equal(model.score(saved.history[0].match).us,1);
  assert.equal(model.topScorers(model.validateState(saved)).players[0].name,'Oud teamlid');
- a.run('render()');assert.match(a.element('#app').innerHTML,/Topscorers/);assert.match(a.element('#app').innerHTML,/Oud teamlid/);
+ a.run("actions['team-panel']({dataset:{panel:'statistics'}})");assert.match(a.element('#app').innerHTML,/Topscorers/);assert.match(a.element('#app').innerHTML,/Oud teamlid/);
 });
 test('overslaan of sluiten bewaart een onbekende goal; tegengoal opent geen keuze',()=>{
  const s=model.freshState();s.match.status='live';const a=app(s);
@@ -257,7 +257,7 @@ test('rust opent vrijblijvend keepervoorstel en bewaarde wedstrijd toont minuten
  await a.emit('submit',{id:'substitution-form',data:{in0:'g',position0:'0'}});assert.equal(a.stored().match.lineup[0],'g');
  a.run("actions['confirm-finish']()");assert.equal(a.stored().history[0].players[0].present,true);
  a.run(`actions.history({dataset:{id:'${s.match.id}'}})`);assert.match(a.element('#dialog-content').innerHTML,/Speeltijd deze wedstrijd/);assert.match(a.element('#dialog-content').innerHTML,/25:00/);
- a.run("dialog.close();tab='team';render()");assert.match(a.element('#app').innerHTML,/Totale speeltijd/);assert.match(a.element('#app').innerHTML,/Gemiddeld/);
+ a.run("dialog.close();navigate('team');actions['team-panel']({dataset:{panel:'statistics'}})");assert.match(a.element('#app').innerHTML,/Totale speeltijd/);assert.match(a.element('#app').innerHTML,/Gemiddeld/);
 });
 test('uitwedstrijd zet tegenstander links en houdt doelpuntacties bij het juiste team',()=>{
  const s=model.freshState();s.match.home=false;s.match.opponent='VOC';s.match.status='live';
@@ -274,7 +274,7 @@ test('visueel wisselen toont veldposities en grijze bank met minuten in beide ri
 });
 test('uituitslag in historie en samenvatting is thuis-uit met duidelijk resultaat',()=>{
  const s=model.freshState();Object.assign(s.match,{home:false,opponent:'VOC',status:'ended',events:[{id:'g1',type:'goal',side:'us',at:0},{id:'g2',type:'goal',side:'them',at:0},{id:'g3',type:'goal',side:'them',at:0}]});s.history=[{match:structuredClone(s.match),players:[]}];
- const a=app(s,'#team');assert.match(a.element('#app').innerHTML,/2 – 1/);
+ const a=app(s,'#team');a.run("actions['team-panel']({dataset:{panel:'history'}})");assert.match(a.element('#app').innerHTML,/2 – 1/);
  a.run(`showHistory({dataset:{id:${JSON.stringify(s.match.id)}}})`);assert.match(a.element('#dialog-content').innerHTML,/VOC 2 – 1 Nieuwerkerk/);
  const text=model.matchSummary(s.match);assert.match(text,/Eindstand: 2–1/);assert.match(text,/Verloren/);assert.doesNotMatch(text,/Nieuwerkerk eerst/);
 });
@@ -283,4 +283,85 @@ test('historie toont erin en eruit voor dubbele wissel en herkent positieruil',(
  model.setLineup(s.match,['a','g','h','d','e','f'],60000);model.setLineup(s.match,['g','a','h','d','e','f'],60000);s.match.status='ended';s.history=[{match:structuredClone(s.match),players:structuredClone(s.players)}];
  const a=app(s);a.run(`showHistory({dataset:{id:${JSON.stringify(s.match.id)}}})`);const html=a.element('#dialog-content').innerHTML;
  assert.match(html,/Erin: Speler g, Speler h/);assert.match(html,/Eruit: Speler b, Speler c/);assert.match(html,/Posities gewisseld: Speler g, Speler a/);assert.doesNotMatch(html,/Opstelling: /);
+});
+
+test('concepttraining bewaart ingeplakte links bij tabwissel en houdt een aangepaste begintijd vast',async()=>{
+ const a=app(undefined,'#training');a.run("actions['new-training']()");
+ const form={id:'training-form',elements:{}};
+ for(const [name,value] of Object.entries({date:'2026-11-25',start:'17:30',field:'Veld 5',link0:'',theme:''})){
+  form.elements[name]={form,name,value,dataset:{},hasAttribute:()=>false};
+ }
+ async function enter(name,value){const el=form.elements[name];el.value=value;await a.emit('input',el);await a.emit('change',el);}
+ await enter('date','2026-11-27');assert.equal(form.elements.start.value,'17:45');
+ await enter('start','18:10');await enter('field','Veld 2');
+ await enter('date','2026-12-02');assert.equal(form.elements.start.value,'18:10');
+ assert.match(a.element('#training-time-preview').textContent,/18:10 · Veld 2/);
+ await enter('link0','https://rinus.knvb.nl/exercise/id/23');
+ a.run("tab='wedstrijd';render();tab='training';render()");
+ const html=a.element('#app').innerHTML;assert.match(html,/value="https:\/\/rinus\.knvb\.nl\/exercise\/id\/23"/);
+ assert.match(html,/18:10 · Veld 2/);assert.equal(a.stored().trainings.length,0);
+ a.run("actions['cancel-training']();actions['new-training']()");assert.doesNotMatch(a.element('#app').innerHTML,/exercise\/id\/23/);
+});
+
+function kickoffSetup(presentCount,fieldCount){
+ const s=model.freshState();s.players=Array.from({length:8},(_,i)=>({id:'p'+i,name:'Speler '+i,present:i<presentCount}));
+ model.setLineup(s.match,Array.from({length:6},(_,i)=>i<fieldCount?'p'+i:null));return app(s);
+}
+test('onvolledige opstelling: aanpassen of bewust starten met minder spelers',()=>{
+ const a=kickoffSetup(8,1);a.run('actions.clock()');
+ assert.equal(a.stored().match.status,'ready');
+ assert.match(a.element('#dialog-content').innerHTML,/Start met 1 speler</);
+ a.run("actions['kickoff-lineup']()");
+ assert.equal(a.run('tab'),'opstelling');assert.equal(a.element('#dialog').open,false);
+ assert.equal(a.stored().match.startedAt,null);
+ a.run("actions.clock(); actions['confirm-kickoff']()");
+ assert.equal(a.stored().match.status,'live');assert.equal(a.stored().match.initialLineup.filter(Boolean).length,1);
+ a.run("actions.clock(); actions.clock()");
+ assert.equal(a.element('#dialog').open,false);assert.ok(a.stored().match.startedAt);
+});
+test('aftrap met lege, voltallige en kleinere beschikbare selectie',()=>{
+ const empty=kickoffSetup(8,0);empty.run('actions.clock()');
+ assert.equal(empty.run('tab'),'opstelling');assert.equal(empty.stored().match.startedAt,null);
+ for(const [present,field] of [[5,5],[8,6]]){
+  const a=kickoffSetup(present,field);a.run('actions.clock()');
+  assert.equal(a.element('#dialog').open,false);assert.equal(a.stored().match.status,'live');
+ }
+});
+
+test('opslagfout en gelijktijdige wijziging: bewaar lokale acties en overschrijf het andere tabblad niet',()=>{
+ const listeners={},local=model.freshState(),other=model.freshState();
+ let onDisk=JSON.stringify(local),writable=false;
+ const a=app(local,'',{window:{addEventListener:(event,fn)=>{listeners[event]=fn;}},localStorage:{getItem:()=>onDisk,setItem:(_,v)=>{if(!writable)throw Error('quota');onDisk=v;}}});
+ a.run("state.players.push({id:'a',name:'Ali',present:true});update()");
+ assert.match(a.element('#connection').textContent,/niet opgeslagen/i);
+ other.match.opponent='Wijziging elders';writable=true;onDisk=JSON.stringify(other);
+ listeners.storage({key:'zijlijn-v1',newValue:onDisk});
+ assert.equal(a.run('state.players[0]?.name'),'Ali');assert.match(a.run('storageError'),/ander tabblad/);
+ assert.equal(a.run('save()'),false);assert.equal(JSON.parse(a.run('persistence.recovery()')).match.opponent,'Wijziging elders');
+ assert.equal(JSON.parse(onDisk).match.opponent,'Wijziging elders');
+ a.run('pendingImport=structuredClone(state);restoreBackup()');
+ assert.equal(JSON.parse(onDisk).players[0].name,'Ali');
+});
+test('afwezigen zijn voor de aftrap zichtbaar met directe route naar aanwezigheid',()=>{
+ const a=kickoffSetup(6,6);a.run("teamPanel='statistics';render()");
+ assert.match(a.element('#app').innerHTML,/Afwezig: Speler 6, Speler 7 · Wijzigen/);
+ a.run("actions['kickoff-presence']()");
+ assert.equal(a.run('tab'),'team');assert.equal(a.run('teamPanel'),'players');
+ const b=kickoffSetup(8,6);assert.doesNotMatch(b.element('#app').innerHTML,/data-action="kickoff-presence"/);
+});
+test('update vanuit ander tabblad herlaadt geen wedstrijd met onopgeslagen gegevens',()=>{
+ let change,reloads=0,writable=false;
+ const sw={controller:{},addEventListener:(type,fn)=>{if(type==='controllerchange')change=fn;},register:()=>new Promise(()=>{})};
+ const a=app(undefined,'',{navigator:{onLine:false,serviceWorker:sw},location:{hash:'',reload:()=>reloads++},localStorage:{getItem:()=>null,setItem(){if(!writable)throw Error('quota');}}});
+ a.run("state.match.opponent='Test';update()");change();assert.equal(reloads,0);
+ writable=true;a.run('save()');change();assert.equal(reloads,1);
+});
+
+test('speler verwijderen vraagt bevestiging en bewaart de historische selectie',()=>{
+ const s=model.freshState();s.players=[{id:'a',name:'Ali',present:true}];model.setLineup(s.match,['a',null,null,null,null,null]);
+ const past=model.freshMatch();past.status='ended';s.history=[{match:past,players:structuredClone(s.players)}];
+ const a=app(s,'#team');a.run("actions['delete-player']({dataset:{id:'a'}})");
+ assert.equal(a.stored().players.length,1);assert.match(a.element('#dialog-content').innerHTML,/Annuleren/);
+ a.run("actions['confirm-delete-player']({dataset:{id:'a'}})");
+ const after=model.validateState(a.stored());assert.equal(after.players.length,0);assert.ok(after.match.lineup.every(id=>!id));assert.equal(after.history[0].players[0].name,'Ali');
 });

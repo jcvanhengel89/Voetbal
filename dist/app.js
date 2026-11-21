@@ -2,7 +2,7 @@ import {PREFERRED_LINES,positionLine,playingStatistics,playingTimePlan,proposeSu
 import {createPersistence} from './persistence.js';
 import {BLOCKS,nextTrainingDate,defaultStart,createTraining,schedule,trainingElapsed,startTraining,pauseTraining,nextBlock,trainingText} from './training.js';
 import {freshState,freshMatch,uid,elapsed,score,matchSides,minutes,start,pause,setLineup,setFormation,positionNames,FORMATIONS,normalizeTeamUrl,undo,validateState,removeGoal,matchSummary,changeGame,undoGame,reminders,backupDue,topScorers,deleteHistory} from './model.js';
-const APP_VERSION='1.8.0';
+const APP_VERSION='1.8.1';
 const KEY='zijlijn-v1', $=s=>document.querySelector(s), app=$('#app'), dialog=$('#dialog');
 let state=freshState(), storageError='', tab=location.hash.slice(1)||'wedstrijd', toastTimer, wakeLock=null, wakePending=false, presentationOpen=false, presentationFullscreen=false;
 let swRegistration, waitingWorker, updateCheck='Nog niet gecontroleerd', latestVersion='', lastUpdateCheck=0, checkingUpdate=false;
@@ -21,6 +21,13 @@ function save(){const before=storageError,success=persistence.save(state);storag
 function update(){save();render();}
 function modal(title,html){$('#dialog-content').innerHTML=`<div class="dialog-head"><h2 id="dialog-title">${title}</h2><button class="close" data-action="close" aria-label="Sluiten">×</button></div>${html}`;if(!dialog.open)dialog.showModal();}
 function confirmAction(title,text,action,label='Bevestigen'){modal(title,`<p>${text}</p><div class="row"><button data-action="close">Annuleren</button><button class="primary" data-action="${action}">${label}</button></div>`);}
+function navigate(next){
+ if(!['wedstrijd','opstelling','training','team'].includes(next))next='wedstrijd';
+ tab=next;
+ if(location.hash!=='#'+next)location.hash=next;
+ render();
+ window.scrollTo?.(0,0);
+}
 function render(){
  if(!['wedstrijd','opstelling','training','team'].includes(tab))tab='wedstrijd';
  document.querySelectorAll('[data-tab]').forEach(b=>{b.classList.toggle('active',b.dataset.tab===tab);b.setAttribute('aria-current',b.dataset.tab===tab?'page':'false');});
@@ -37,6 +44,7 @@ function benchButtons(){const times=minutes(state.match);return bench().map(p=>`
 function lineupCard(showBench=true){return `<section class="card"><div class="card-head"><h2>Op het veld</h2><span class="pill">${state.match.lineup.filter(Boolean).length} / 6</span></div>${formationSelect()}${pitch()}<button class="wide presentation-button" data-action="show-lineup">${expandIcon()} Opstelling tonen</button>${showBench?`<div class="subtle-row"><h3>Wisselbank</h3><span class="small muted">${bench().length} spelers</span></div><div class="bench">${benchButtons()}</div>${suggestionButtons()}`:''}<p class="hint">${state.players.length?'Tik op een positie of bankspeler om te wisselen.':'Voeg je spelers toe bij Mijn team en tik op een positie.'}</p></section>`;}
 function matchView(){
  const m=state.match,s=score(m),live=m.status==='live',ended=m.status==='ended',last=state.undoHistory.at(-1);
+ const absent=m.status==='ready'?state.players.filter(p=>!p.present):[];
  const team=(side,label)=>`<div class="score-team ${side==='us'?'our-team':''}"><span class="team-owner">${side==='us'?'Ons team':m.home?'Uit':'Thuis'}</span><span class="team-name">${esc(label)}</span><strong class="score-value">${s[side]}</strong><div class="score-controls"><button class="goal-minus" data-action="minus-${side}" aria-label="Doelpunt verwijderen voor ${esc(label)}" ${s[side]===0?'disabled':''}>−</button><button class="goal ${side==='us'?'us':''}" data-action="goal-${side}" aria-label="Doelpunt voor ${esc(label)}" ${!live&&!ended?'disabled':''}>+ Goal</button></div></div>`;
  return `<div class="single match-screen">
   <div class="heading"><h1>Wedstrijd</h1>${!ended?'<button data-action="edit-match" class="ghost">Instellen</button>':''}</div>
@@ -49,7 +57,7 @@ function matchView(){
   </section>
   ${(last||live&&m.half===1)?`<div class="match-tools">${last?`<button class="text-button" data-action="undo">Herstel: ${esc(last.label)}</button>`:''}${live&&m.half===1?'<button class="text-button" data-action="finish">Wedstrijd afronden</button>':''}</div>`:''}
   <div id="match-reminders" aria-live="polite"></div>
-  ${!ended?`<section class="card quick-bench"><div class="card-head"><h2>Wisselbank</h2><span class="small muted">Minste speeltijd eerst</span></div><div class="bench">${benchButtons()||`<span class="muted small">${!state.players.length?'Voeg spelers toe via Mijn team.':'Geen bankspelers aanwezig.'}</span>`}</div>${suggestionButtons()}<p class="rotation-advice" id="rotation-advice"></p>${m.status==='ready'?'<p class="hint">Stel je team op via het tabblad Opstelling.</p>':''}</section>`:''}
+  ${!ended?`<section class="card quick-bench"><div class="card-head"><h2>Wisselbank</h2><span class="small muted">Minste speeltijd eerst</span></div><div class="bench">${benchButtons()||`<span class="muted small">${!state.players.length?'Voeg spelers toe via Mijn team.':'Geen bankspelers aanwezig.'}</span>`}</div>${suggestionButtons()}<p class="rotation-advice" id="rotation-advice"></p>${m.status==='ready'?'<p class="hint">Stel je team op via het tabblad Opstelling.</p>':''}${absent.length?`<button class="text-button kickoff-presence" data-action="kickoff-presence">Afwezig: ${absent.map(p=>esc(p.name)).join(', ')} · Wijzigen</button>`:''}</section>`:''}
   <details class="card match-report" ${ended?'open':''}><summary>Verslag & samenvatting</summary>
    <button class="wide summary-button" data-action="summary">Samenvatting voor ouders</button>
    <label class="stack">Notities<textarea data-match-notes maxlength="10000" rows="3" placeholder="Mooie momenten of aandachtspunten…">${esc(m.notes)}</textarea></label><p class="hint">Wordt automatisch bewaard voor je verslag.</p>
@@ -68,9 +76,7 @@ function teamView(){
  const panels={players:'Spelers',statistics:'Statistieken',history:'Historie'};
  return `<div class="single team-screen"><div class="heading"><h1>Mijn team</h1><button class="text-button" data-action="settings">Instellingen</button></div>
   <nav class="team-subnav" aria-label="Teamoverzicht">${Object.entries(panels).map(([key,label])=>`<button data-action="team-panel" data-panel="${key}" aria-current="${teamPanel===key?'page':'false'}">${label}</button>`).join('')}</nav>
-  <div id="team-players" aria-label="Spelers" ${teamPanel!=='players'?'hidden':''}>${playersSection()}</div>
-  <div id="team-statistics" aria-label="Statistieken" ${teamPanel!=='statistics'?'hidden':''}>${topScorersCard()}${playingStatsCard()}</div>
-  <div id="team-history" aria-label="Historie" ${teamPanel!=='history'?'hidden':''}>${historySection()}</div>
+  <div id="team-${teamPanel}" aria-label="${panels[teamPanel]}">${teamPanel==='players'?playersSection():teamPanel==='history'?historySection():topScorersCard()+playingStatsCard()}</div>
  </div>`;
 }
 function playersSection(){
@@ -103,7 +109,7 @@ function historyScorers(m){
 }
 function topScorersCard(){
  const totals=topScorers(state);let rank=0;
- return `<section class="card"><h2>Topscorers</h2><p class="hint">Alle bewaarde wedstrijden, inclusief de huidige wedstrijd. Alleen doelpunten met een maker tellen bij een speler mee.</p>${totals.players.length?`<ol class="scorer-ranking">${totals.players.map((p,i)=>{if(i===0||p.goals!==totals.players[i-1].goals)rank=i+1;return `<li><span class="scorer-rank">${rank}.</span><span class="player-info"><strong>${esc(p.name)}</strong></span><strong>${p.goals} ${p.goals===1?'goal':'goals'}</strong></li>`;}).join('')}</ol>`:'<p class="muted small">Nog geen doelpuntenmakers geregistreerd.</p>'}${totals.unknown?`<p class="hint">Nog zonder maker: ${totals.unknown} ${totals.unknown===1?'doelpunt':'doelpunten'}. Vul namen aan bij Wedstrijdverloop of open een vorige wedstrijd hieronder.</p>`:''}</section>`;
+ return `<section class="card"><h2>Topscorers</h2><p class="hint">Alle bewaarde wedstrijden, inclusief de huidige wedstrijd. Alleen doelpunten met een maker tellen bij een speler mee.</p>${totals.players.length?`<ol class="scorer-ranking">${totals.players.map((p,i)=>{if(i===0||p.goals!==totals.players[i-1].goals)rank=i+1;return `<li><span class="scorer-rank">${rank}.</span><span class="player-info"><strong>${esc(p.name)}</strong></span><strong>${p.goals} ${p.goals===1?'goal':'goals'}</strong></li>`;}).join('')}</ol>`:'<p class="muted small">Nog geen doelpuntenmakers geregistreerd.</p>'}${totals.unknown?`<p class="hint">Nog zonder maker: ${totals.unknown} ${totals.unknown===1?'doelpunt':'doelpunten'}. Vul namen aan bij Wedstrijdverloop of open een vorige wedstrijd bij Historie.</p>`:''}</section>`;
 }
 function chooseScorer(matchId,eventId,newGoal=false,history=false){
  const m=matchById(matchId),event=m?.events.find(e=>e.id===eventId&&e.type==='goal'&&e.side==='us');if(!event)return;
@@ -126,7 +132,10 @@ function assignScorer(id){
  }else apply();
  dialog.close();update();if(selection.history)showHistory({dataset:{id:m.id}});toast('Doelpuntenmaker opgeslagen');
 }
-function tick(){tickTraining();tickReminders();tickRotationAdvice();const m=state.match,t=elapsed(m),c=$('#clock');if(c)c.textContent=clock(Math.max(0,t-m.halfStartedAt));const l=$('#timer-label');if(l)l.textContent=`${m.half}e helft · totaal ${clock(t)}${m.startedAt===null?' · Klok staat stil':''}${t-m.halfStartedAt>=m.halfMinutes*60000?' · Richttijd bereikt':''}`;const times=minutes(m);document.querySelectorAll('[data-time]').forEach(el=>el.textContent=clock(times[el.dataset.time]||0));document.querySelectorAll('[data-bar]').forEach(el=>el.style.width=`${t?Math.min(100,(times[el.dataset.bar]||0)/t*100):0}%`);const connection=$('#connection');if(connection)connection.textContent=!navigator.onLine?'Offline · gegevens blijven op dit toestel':offlineReady?'Offline beschikbaar · opgeslagen op dit toestel':'Opgeslagen op dit toestel';}
+function tick(){tickTraining();if(tab==='wedstrijd'){
+ const plan=state.match.status!=='ended'&&present().length>6?playingTimePlan(state):null;
+ tickReminders(plan);tickRotationAdvice(plan);
+}const m=state.match,t=elapsed(m),c=$('#clock');if(c)c.textContent=clock(Math.max(0,t-m.halfStartedAt));const l=$('#timer-label');if(l)l.textContent=`${m.half}e helft · totaal ${clock(t)}${m.startedAt===null?' · Klok staat stil':''}${t-m.halfStartedAt>=m.halfMinutes*60000?' · Richttijd bereikt':''}`;const times=minutes(m);document.querySelectorAll('[data-time]').forEach(el=>el.textContent=clock(times[el.dataset.time]||0));document.querySelectorAll('[data-bar]').forEach(el=>el.style.width=`${t?Math.min(100,(times[el.dataset.bar]||0)/t*100):0}%`);const connection=$('#connection');if(connection)connection.textContent=storageError?'Wijzigingen niet opgeslagen':!navigator.onLine?'Offline · gegevens blijven op dit toestel':offlineReady?'Offline beschikbaar · opgeslagen op dit toestel':'Opgeslagen op dit toestel';}
 function choosePosition(index){showSwap({index});}
 function showSwap({index=null,incoming=null}={}){
  const m=state.match;if(m.status==='ended')return;
@@ -186,6 +195,28 @@ function download(text,filename){const u=URL.createObjectURL(new Blob([text],{ty
 let pendingImport=null;
 function finishMatch(){const m=state.match;if(m.status!=='live')return;pause(m);m.status='ended';state.undoHistory=[];state.history.push({match:structuredClone(m),players:state.players.map(p=>({id:p.id,name:p.name,present:p.present}))});keepAwake();dialog.close();update();toast('Wedstrijd bewaard');}
 function startNewMatch(){if(state.match.status!=='ended')return;state.match=freshMatch();state.undoHistory=[];dialog.close();update();}
+function openKickoffLineup(){
+ if(dialog.open)dialog.close();
+ navigate('opstelling');
+ document.querySelector('.pitch .position.empty')?.focus();
+}
+function toggleMatchClock(startShort=false){
+ const m=state.match;if(m.status==='ended')return;
+ if(m.startedAt!==null)pause(m);
+ else{
+  if(m.status==='ready'){
+   const field=m.lineup.filter(Boolean).length,available=Math.min(m.lineup.length,present().length);
+   if(!field){openKickoffLineup();toast('Zet eerst spelers in de opstelling.');return;}
+   if(field<available&&!startShort){
+    const players=field===1?'speler':'spelers';
+    modal('Opstelling nog niet compleet',`<p>Er ${field===1?'staat':'staan'} ${field} van de ${available} mogelijke spelers op het veld. Alleen opgestelde spelers krijgen vanaf de aftrap speeltijd.</p><div class="stack"><button class="primary" data-action="kickoff-lineup">Opstelling aanpassen</button><button data-action="confirm-kickoff">Start met ${field} ${players}</button></div>`);return;
+   }
+   state.undoHistory=[];
+  }
+  start(m);
+ }
+ keepAwake();update();
+}
 const actions={
  'settings':showSettings,
  'team-panel':b=>{if(['players','statistics','history'].includes(b.dataset.panel)){teamPanel=b.dataset.panel;render();}},
@@ -194,7 +225,10 @@ const actions={
  'position':b=>choosePosition(Number(b.dataset.index)),
  'assign':b=>assign(Number(b.dataset.index),b.dataset.id),
  'bench':b=>showSwap({incoming:b.dataset.id}),
- 'clock':()=>{const m=state.match;if(m.status==='ended')return;if(m.startedAt!==null)pause(m);else {if(m.status==='ready'&&!m.lineup.some(Boolean)){toast('Zet eerst spelers in de opstelling.');tab='opstelling';location.hash=tab;render();return;}if(m.status==='ready')state.undoHistory=[];start(m);}keepAwake();update();},
+ 'clock':()=>toggleMatchClock(),
+ 'confirm-kickoff':()=>{if(state.match.status!=='ready')return;dialog.close();toggleMatchClock(true);},
+ 'kickoff-lineup':openKickoffLineup,
+ 'kickoff-presence':()=>{teamPanel='players';navigate('team');},
  'goal-us':()=>goal('us'),'goal-them':()=>goal('them'),
  'minus-us':()=>subtractGoal('us'),'minus-them':()=>subtractGoal('them'),
  'edit-scorer':b=>chooseScorer(b.dataset.match,b.dataset.event,false,b.dataset.history==='true'),
@@ -208,7 +242,12 @@ const actions={
  'new-match':()=>confirmAction('Nieuwe wedstrijd','Je team blijft bewaard. De score, klok en opstelling beginnen opnieuw.','confirm-new','Nieuwe wedstrijd'),
  'confirm-new':startNewMatch,
  'edit-player':b=>{const p=state.players.find(p=>p.id===b.dataset.id);modal('Speler bewerken',`<form id="player-form" data-id="${esc(p.id)}" class="stack"><label>Voornaam<input name="name" value="${esc(p.name)}" maxlength="40" required></label><label>Voorkeurslinie<select name="preferredLine">${Object.entries(PREFERRED_LINES).map(([key,label])=>`<option value="${key}" ${(p.preferredLine||'any')===key?'selected':''}>${label}</option>`).join('')}</select></label><p class="hint">Een voorkeur, geen vaste plek. Speeltijd en afwisseling blijven leidend.</p><button type="submit" class="primary">Opslaan</button></form>${state.match.status==='ready'?`<button class="text-button danger" data-action="delete-player" data-id="${esc(p.id)}">Speler verwijderen</button>`:''}`);},
- 'delete-player':b=>{const id=b.dataset.id;if(state.match.status!=='ready')return;state.undoHistory=[];state.players=state.players.filter(p=>p.id!==id);setLineup(state.match,state.match.lineup.map(x=>x===id?null:x));dialog.close();update();},
+ 'delete-player':b=>{
+  const player=state.players.find(p=>p.id===b.dataset.id);
+  if(!player||state.match.status!=='ready')return;
+  modal('Speler verwijderen',`<p>Wil je <strong>${esc(player.name)}</strong> uit je team verwijderen? Eerder gespeelde wedstrijden blijven bewaard.</p><div class="row"><button data-action="edit-player" data-id="${esc(player.id)}">Annuleren</button><button class="danger" data-action="confirm-delete-player" data-id="${esc(player.id)}">Verwijderen</button></div>`);
+ },
+ 'confirm-delete-player':b=>{const id=b.dataset.id;if(state.match.status!=='ready'||!state.players.some(p=>p.id===id))return;state.undoHistory=[];state.players=state.players.filter(p=>p.id!==id);setLineup(state.match,state.match.lineup.map(x=>x===id?null:x));dialog.close();update();},
  'export':exportBackup,
  'import':()=>$('#import-file').click(),
  'confirm-import':restoreBackup,
@@ -217,7 +256,7 @@ const actions={
 };
 function restoreBackup(){if(!pendingImport)return;state=pendingImport;pendingImport=null;persistence.acceptImport();storageError='';pause(state.match);state.undoHistory=[];state.trainings.forEach(t=>pauseTraining(t));keepAwake();dialog.close();update();toast('Back-up teruggezet. Wedstrijd- en trainingstimers staan op pauze.');}
 function goal(side){const m=state.match;if(m.status==='ready')return;const event={id:uid(),type:'goal',side,at:elapsed(m)};changeGame(state,side==='us'?'doelpunt Nieuwerkerk':'doelpunt tegenstander',()=>m.events.push(event));syncHistory();update();toast(side==='us'?'Doelpunt Nieuwerkerk!':'Doelpunt tegenstander');if(side==='us')chooseScorer(m.id,event.id,true);}
-document.addEventListener('click',e=>{const nav=e.target.closest('[data-tab]');if(nav){tab=nav.dataset.tab;location.hash=tab;render();return;}const b=e.target.closest('[data-action]');if(b&&!b.disabled){try{actions[b.dataset.action]?.(b);}catch(err){toast(err.message);}}});
+document.addEventListener('click',e=>{const nav=e.target.closest('[data-tab]');if(nav){navigate(nav.dataset.tab);return;}const b=e.target.closest('[data-action]');if(b&&!b.disabled){try{actions[b.dataset.action]?.(b);}catch(err){toast(err.message);}}});
 function saveTeamLink(d){state.teamUrl=normalizeTeamUrl(String(d.get('teamUrl')));dialog.close();update();toast('Teamlink opgeslagen');}
 function addPlayer(d){const n=String(d.get('name')).trim();if(!n)return;if(state.players.length>=100)throw Error('Maximaal 100 spelers.');state.players.push({id:uid(),name:n,present:true,preferredLine:'any'});update();$('#add-player input').focus();}
 function saveMatch(d){const m=state.match;if(m.status==='ended')return;const duration=Number(d.get('halfMinutes'));if(!Number.isInteger(duration)||duration<1||duration>60)return;Object.assign(m,{opponent:String(d.get('opponent')).trim(),date:String(d.get('date')),home:d.get('home')==='true',halfMinutes:duration});dialog.close();update();}
@@ -235,8 +274,8 @@ document.addEventListener('change',async e=>{
  if(e.target.dataset.present)setPresence(e.target.dataset.present,e.target.checked);
  if(e.target.id==='import-file'){await prepareImport(e.target.files[0]);e.target.value='';}
 });
-window.addEventListener('hashchange',()=>{tab=location.hash.slice(1);render();});
-window.addEventListener('storage',e=>{if(e.key===KEY&&e.newValue){try{state=validateState(JSON.parse(e.newValue));dialog.close();render();toast('Gegevens bijgewerkt vanuit een ander tabblad.');}catch{}}});
+window.addEventListener('hashchange',()=>{const next=location.hash.slice(1)||'wedstrijd';if(next!==tab)navigate(next);});
+window.addEventListener('storage',e=>{if(e.key===KEY&&e.newValue){try{const incoming=validateState(JSON.parse(e.newValue));if(!persistence.observeExternal(e.newValue)){storageError=persistence.error;$('#storage-status').innerHTML=storageNotice();tick();return;}state=incoming;dialog.close();render();toast('Gegevens bijgewerkt vanuit een ander tabblad.');}catch{}}});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){tick();keepAwake();checkForUpdate();}});
 window.addEventListener('online',()=>{tick();checkForUpdate(true);});window.addEventListener('offline',tick);
 let offlineReady=false;
@@ -270,7 +309,7 @@ function applyUpdate(){
 }
 if('serviceWorker' in navigator){
  let controlled=!!navigator.serviceWorker.controller;
- navigator.serviceWorker.addEventListener('controllerchange',()=>{if(controlled)location.reload();else controlled=true;});
+ navigator.serviceWorker.addEventListener('controllerchange',()=>{if(controlled&&!storageError)location.reload();controlled=true;});
  navigator.serviceWorker.register(workerUrl(APP_VERSION),{updateViaCache:'none'}).then(reg=>{observeRegistration(reg);return navigator.serviceWorker.ready;}).then(()=>{offlineReady=true;tick();checkForUpdate();}).catch(()=>{});
 }
 refreshVersion();checkForUpdate();
@@ -314,18 +353,18 @@ function exportBackup(){
  download(JSON.stringify(snapshot,null,2),`zijlijn-backup-${new Date().toISOString().slice(0,10)}.json`);
  state.backupAt=exportedAt;state.backupMatches=state.history.length;update();toast('Back-up aangeboden als download. Bewaar het bestand op een veilige plek.');
 }
-function tickRotationAdvice(){
+function tickRotationAdvice(plan){
  const host=$('#rotation-advice');if(!host)return;
- const plan=playingTimePlan(state),m=state.match;
- if(present().length<=6||m.status==='ended'){host.textContent='';return;}
+ const m=state.match;
+ if(!plan){host.textContent='';return;}
  let advice=plan.nextSwapAtMs===null?'Bekijk de minuten en wissel naar eigen inzicht.':plan.status==='due'?'Wisseladvies: nu wisselen.':`Wisseladvies: bij ${clock(plan.nextSwapAtMs)} totale speeltijd.`;
  if(m.half===2&&plan.keeper.changeDue)advice='Kies eerst de keeper voor de tweede helft.';
  host.textContent=`${m.status==='ready'?'Na de aftrap verschijnt het volgende wisselmoment.':advice} Richtwaarde ${clock(plan.targetMinutes*60000)} per speler.${m.half===1&&plan.keeper.nextKeeperId?' Keeper na rust: '+name(plan.keeper.nextKeeperId)+'.':''}${plan.equalityFeasible?'':' Exact gelijk spelen is met de huidige verdeling niet meer haalbaar.'}`;
 }
-function tickReminders(){
+function tickReminders(plan){
  const host=$('#match-reminders');if(!host)return;
- const r=reminders(state),m=state.match,plan=playingTimePlan(state),t=elapsed(m);
- const advised=m.status==='live'&&plan.status==='due'&&!plan.keeper.changeDue&&(!m.swapSnoozeAt||t>=m.swapSnoozeAt+120000);
+ const r=reminders(state),m=state.match,t=elapsed(m);
+ const advised=m.status==='live'&&plan?.status==='due'&&!plan.keeper.changeDue&&(!m.swapSnoozeAt||t>=m.swapSnoozeAt+120000);
  const html=(r.timeout?'<div class="reminder"><span>Tijd voor de time-out van deze helft.</span><button data-action="timeout">Time-out starten</button></div>':'')+
  (advised?'<div class="reminder"><span>Wisseladvies: nu wisselen voor een gelijkere speeltijd.</span><button data-action="suggest-subs">Voorstel bekijken</button><button data-action="snooze-swap">Over 2 minuten</button></div>':r.swap?'<div class="reminder"><span>Je ingestelde wisselherinnering. Bekijk ook het speeltijdadvies bij de bank.</span><button data-action="suggest-subs">Voorstel bekijken</button><button data-action="snooze-swap">Later</button></div>':'');
  if(host.innerHTML!==html)host.innerHTML=html;
@@ -372,7 +411,7 @@ function historySubstitution(e,player){
 }
 function showHistory(b){
  const h=state.history.find(h=>h.match.id===b.dataset.id);if(!h)return;
- const m=h.match,s=score(m),times=minutes(m),player=id=>h.players.find(p=>p.id===id)?.name||'Onbekende speler';
+ const m=h.match,player=id=>h.players.find(p=>p.id===id)?.name||'Onbekende speler';
  const events=m.events.map(e=>e.type==='goal'?`Doelpunt ${e.side==='us'?'Nieuwerkerk'+(e.scorerId?' · '+player(e.scorerId):''):m.opponent||'tegenstander'}`:e.type==='formation'?`Formatie ${e.beforeFormation} → ${e.formation}`:historySubstitution(e,player));
  modal('Wedstrijd terugkijken',`<p class="eyebrow">${esc(dateLabel(m))}</p><h3>${esc(matchSides(m)[0].name)} ${matchSides(m)[0].goals} – ${matchSides(m)[1].goals} ${esc(matchSides(m)[1].name)}</h3><p class="muted small">${m.home?'Thuis':'Uit'} · ${clock(elapsed(m))} gespeeld</p>${historyScorers(m)}${historyPlayingTimes(h)}<details><summary>Eindopstelling · ${m.formation}</summary>${m.lineup.map((id,i)=>`<div class="history-row"><span>${positionNames(m)[i]}</span><strong>${esc(id?player(id):'Lege plek')}</strong></div>`).join('')}</details><details><summary>Wissels & doelpunten</summary><ol class="timeline">${m.events.map((e,i)=>`<li><time>${clock(e.at)}</time><span>${esc(events[i])}</span></li>`).join('')}</ol></details>${m.notes?`<p class="preserve-lines">${esc(m.notes)}</p>`:''}<button class="wide" data-action="summary" data-id="${esc(m.id)}">Samenvatting bekijken</button><button class="wide text-button danger" data-action="delete-history" data-id="${esc(m.id)}">Wedstrijd verwijderen</button>`);
 }
@@ -406,37 +445,48 @@ let trainingDraft=null;
 const currentTraining=()=>state.trainings.find(t=>t.id===state.selectedTrainingId);
 const trainingDateLabel=t=>new Date(`${t.date}T12:00:00`).toLocaleDateString('nl-NL',{weekday:'long',day:'numeric',month:'long'});
 function trainingForm(){
- const d=trainingDraft,date=d?.date||nextTrainingDate();
- return `<section class="card"><h2>${d?.id?'Training aanpassen':'Nieuwe training'}</h2><p class="muted small">Vier vaste onderdelen, samen 70 minuten. Vul de drie oefenlinks in; de tijden worden automatisch berekend.</p><form id="training-form" class="stack"><label>Trainingsdatum<input name="date" type="date" value="${esc(date)}" required></label><div class="training-time-preview small muted" id="training-time-preview">${esc(d?.start||defaultStart(date))} · ${esc(d?.field||'Veld 5')}</div>${BLOCKS.map((b,i)=>`<label>${b.name} · ${b.minutes} min${i===3?' (link optioneel)':''}<input name="link${i}" type="url" value="${esc(d?.links?.[i]||'')}" maxlength="2048" placeholder="https://rinus.knvb.nl/…" ${i<3?'required':''} autocapitalize="off" autocomplete="off"></label>`).join('')}<details><summary>Thema, begintijd of veld aanpassen</summary><div class="stack"><label>Thema (optioneel)<input name="theme" maxlength="200" value="${esc(d?.theme||'')}" placeholder="Bijvoorbeeld: aanvallen"></label><label>Begintijd<input name="start" type="time" required value="${esc(d?.start||defaultStart(date))}"></label><label>Veld<input name="field" maxlength="100" value="${esc(d?.field||'Veld 5')}"></label></div></details><button class="primary" type="submit">Schema opslaan</button><button type="button" data-action="cancel-training">Annuleren</button></form></section>`;
+ const d=trainingDraft,date=d?.date??nextTrainingDate();
+ return `<section class="card"><h2>${d?.id?'Training aanpassen':'Nieuwe training'}</h2><p class="muted small">Vier vaste onderdelen, samen 70 minuten. Vul de drie oefenlinks in; de tijden worden automatisch berekend.</p><form id="training-form" class="stack"><label>Trainingsdatum<input name="date" type="date" value="${esc(date)}" required></label><div class="training-time-preview small muted" id="training-time-preview">${esc(d?.start??defaultStart(date))} · ${esc(d?.field??'Veld 5')}</div>${BLOCKS.map((b,i)=>`<label>${b.name} · ${b.minutes} min${i===3?' (link optioneel)':''}<input name="link${i}" type="url" value="${esc(d?.links?.[i]||'')}" maxlength="2048" placeholder="https://rinus.knvb.nl/…" ${i<3?'required':''} autocapitalize="off" autocomplete="off"></label>`).join('')}<details><summary>Thema, begintijd of veld aanpassen</summary><div class="stack"><label>Thema (optioneel)<input name="theme" maxlength="200" value="${esc(d?.theme||'')}" placeholder="Bijvoorbeeld: aanvallen"></label><label>Begintijd<input name="start" type="time" required value="${esc(d?.start??defaultStart(date))}"></label><label>Veld<input name="field" maxlength="100" value="${esc(d?.field??'Veld 5')}"></label></div></details><button class="primary" type="submit">Schema opslaan</button><button type="button" data-action="cancel-training">Annuleren</button></form></section>`;
 }
 function trainingView(){
  const t=currentTraining();
- return `<div class="single"><div class="heading"><h1>Training</h1><button data-action="new-training">Nieuwe training</button></div>${trainingDraft?trainingForm():t?trainingDetail(t):`<section class="card"><h2>Je training in vier stappen</h2><p>Warming-up, twee oefeningen en afsluiten met partijen. Voeg Rinus-links toe en het schema staat klaar.</p><p class="small muted">Woensdag 17.30–18.40 · vrijdag 17.45–18.55<br>Veld 5 · tijden zijn aanpasbaar</p><button class="primary wide" data-action="new-training">Eerste training maken</button></section>`}<section class="card"><h2>Bewaarde trainingen</h2>${state.trainings.length?[...state.trainings].sort((a,b)=>b.date.localeCompare(a.date)).map(x=>`<button class="history-row wide" data-action="open-training" data-id="${esc(x.id)}"><span>${esc(trainingDateLabel(x))}<small class="block muted">${esc(x.theme||'Warming-up · oefeningen · partijen')}</small></span><span class="small">${x.run.status==='ended'?'Afgerond':x.run.status==='live'?'Bezig':'Gepland'} ›</span></button>`).join(''):'<p class="muted small">Je opgeslagen schema’s verschijnen hier.</p>'}</section><p class="offline-note">Schema en notities blijven op dit toestel. Rinus-instructies openen met internet.</p></div>`;
+ return `<div class="single"><div class="heading"><h1>Training</h1>${!trainingDraft&&t?'<button data-action="new-training">Nieuwe training</button>':''}</div>${trainingDraft?trainingForm():t?trainingDetail(t):`<section class="card"><h2>Je training in vier stappen</h2><p>Warming-up, twee oefeningen en afsluiten met partijen. Voeg Rinus-links toe en het schema staat klaar.</p><p class="small muted">Woensdag 17.30–18.40 · vrijdag 17.45–18.55<br>Veld 5 · tijden zijn aanpasbaar</p><button class="primary wide" data-action="new-training">Eerste training maken</button></section>`}${trainingDraft?'':`<section class="card"><h2>Bewaarde trainingen</h2>${state.trainings.length?[...state.trainings].sort((a,b)=>b.date.localeCompare(a.date)).map(x=>`<button class="history-row wide" data-action="open-training" data-id="${esc(x.id)}" ${!trainingDraft&&x.id===t?.id?'aria-current="true"':''}><span>${esc(trainingDateLabel(x))}<small class="block muted">${esc(x.theme||'Warming-up · oefeningen · partijen')}</small></span><span class="small">${x.run.status==='ended'?'Afgerond':x.run.status==='live'?(x.run.startedAt===null?'Gepauzeerd':'Loopt'):'Gepland'} ›</span></button>`).join(''):'<p class="muted small">Je opgeslagen schema’s verschijnen hier.</p>'}</section>`}<p class="offline-note">Schema en notities blijven op dit toestel. Rinus-instructies openen met internet.</p></div>`;
 }
 function trainingDetail(t){
  const blocks=schedule(t),r=t.run,b=blocks[r.index];
- return `<section class="card"><div class="card-head"><h2>${esc(trainingDateLabel(t))}</h2><span class="pill">${r.status==='ended'?'Afgerond':'70 minuten'}</span></div><p class="muted small">${t.start}–${blocks[3].end} · ${esc(t.field)}${t.theme?' · '+esc(t.theme):''}</p>${r.status!=='ended'?`<div class="training-active"><p class="eyebrow">${r.status==='ready'?'Begin met':'Nu aan de beurt'}</p><h2>${b.name}</h2><div class="clock" id="training-clock"></div><p class="small muted" id="training-timer-label"></p>${b.url?`<a class="button-link wide" href="${esc(b.url)}" target="_blank" rel="noopener noreferrer">Open oefening in Rinus ↗</a>`:'<p class="small muted">Partijspel naar eigen invulling.</p>'}<div class="row"><button class="primary" data-action="training-clock">${r.startedAt!==null?'Ⅱ Pauze':r.status==='ready'?'▶ Start training':'▶ Hervatten'}</button><button data-action="training-next" ${r.status==='ready'?'disabled':''}>${r.index===3?'Afronden':'Volgende'}</button></div></div>`:'<p>Training afgerond. Bewaar hieronder wat goed ging en wat je nog wilt oefenen.</p>'}<ol class="training-schedule">${blocks.map((x,i)=>`<li class="${r.status!=='ready'&&r.status!=='ended'&&r.index===i?'current':''}"><span class="schedule-time">${x.start}–${x.end}</span><span><strong>${x.name}</strong><small>${x.minutes} minuten</small></span>${x.url?`<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer" aria-label="${x.name} openen in Rinus">Rinus ↗</a>`:''}</li>`).join('')}</ol><p class="hint">Dit zijn geplande tijden. De timer volgt jouw start en pauzes; tik zelf op Volgende om door te gaan.</p><div class="row"><button data-action="share-training">Schema delen</button><button data-action="reuse-training">Hergebruiken</button></div>${r.status==='ready'?'<button class="text-button" data-action="edit-training">Links of datum aanpassen</button>':''}<details><summary>Notities & materialen</summary><label class="stack">Voorbereiding en terugblik<textarea data-training-notes maxlength="10000" rows="4" placeholder="Materialen, coachpunten, wat ging goed…">${esc(t.notes)}</textarea></label><p class="hint">Wordt automatisch bewaard.</p></details></section>`;
+ return `<section class="card"><div class="card-head"><h2>${esc(trainingDateLabel(t))}</h2><span class="pill">${r.status==='ended'?'Afgerond':'70 minuten'}</span></div><p class="muted small">${t.start}–${blocks[3].end} · ${esc(t.field)}${t.theme?' · '+esc(t.theme):''}</p>${r.status!=='ended'?`<div class="training-active"><p class="eyebrow">${r.status==='ready'?'Begin met':'Nu aan de beurt'}</p><h2>${b.name}</h2><div class="clock" id="training-clock" role="timer" aria-label="Resterende tijd"></div><p class="small muted" id="training-timer-label"></p>${b.url?`<a class="button-link wide" href="${esc(b.url)}" target="_blank" rel="noopener noreferrer">Open oefening in Rinus ↗</a>`:'<p class="small muted">Partijspel naar eigen invulling.</p>'}<div class="row"><button class="primary" data-action="training-clock">${r.startedAt!==null?'Ⅱ Pauze':r.status==='ready'?'▶ Start training':'▶ Hervatten'}</button><button data-action="training-next" ${r.status==='ready'?'disabled':''}>${r.index===3?'Afronden':'Volgende'}</button></div></div>`:'<p>Training afgerond. Bewaar hieronder wat goed ging en wat je nog wilt oefenen.</p>'}<ol class="training-schedule">${blocks.map((x,i)=>`<li class="${r.status!=='ready'&&r.status!=='ended'&&r.index===i?'current':''}"><span class="schedule-time">${x.start}–${x.end}</span><span><strong>${x.name}</strong><small>${x.minutes} minuten</small></span>${x.url?`<a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer" aria-label="${x.name} openen in Rinus">Rinus ↗</a>`:''}</li>`).join('')}</ol><p class="hint">Dit zijn geplande tijden. De timer volgt jouw start en pauzes; tik zelf op Volgende om door te gaan.</p><div class="row"><button data-action="share-training">Schema delen</button><button data-action="reuse-training">Hergebruiken</button></div>${r.status==='ready'?'<button class="text-button" data-action="edit-training">Links of datum aanpassen</button>':''}<details><summary>Notities & materialen</summary><label class="stack">Voorbereiding en terugblik<textarea data-training-notes maxlength="10000" rows="4" placeholder="Materialen, coachpunten, wat ging goed…">${esc(t.notes)}</textarea></label><p class="hint">Wordt automatisch bewaard.</p></details></section>`;
 }
 function tickTraining(){
  const el=$('#training-clock'),t=currentTraining();if(!el||!t)return;
  const remaining=BLOCKS[t.run.index].minutes*60000-trainingElapsed(t);
  el.textContent=clock(Math.max(0,remaining));
- $('#training-timer-label').textContent=remaining<=0?'Tijd verstreken · tik op Volgende wanneer je klaar bent':t.run.startedAt!==null?'Resterende tijd':t.run.status==='ready'?'Klaar om te beginnen':'Gepauzeerd';
+ $('#training-timer-label').textContent=remaining<=0?`Tijd verstreken · tik op ${t.run.index===BLOCKS.length-1?'Afronden':'Volgende'} wanneer je klaar bent`:t.run.startedAt!==null?'Resterende tijd':t.run.status==='ready'?'Klaar om te beginnen':'Gepauzeerd';
 }
 Object.assign(actions,{
  'new-training':()=>{if(state.trainings.length>=500){toast('Maximaal 500 trainingen.');return;}trainingDraft={};render();},
  'cancel-training':()=>{trainingDraft=null;render();},
  'open-training':b=>{state.selectedTrainingId=b.dataset.id;trainingDraft=null;update();},
- 'edit-training':()=>{const t=currentTraining();if(t?.run.status==='ready'){trainingDraft=structuredClone(t);render();}},
+ 'edit-training':()=>{const t=currentTraining();if(t?.run.status==='ready'){trainingDraft={...structuredClone(t),customStart:t.start!==defaultStart(t.date)};render();}},
  'reuse-training':()=>{const t=currentTraining();if(!t)return;trainingDraft={...structuredClone(t),id:null,date:nextTrainingDate(),start:defaultStart(nextTrainingDate())};render();},
  'training-clock':()=>{const t=currentTraining();if(!t)return;if(t.run.startedAt!==null)pauseTraining(t);else{if(state.trainings.some(x=>x.id!==t.id&&x.run.status==='live')){toast('Rond eerst de andere lopende training af.');return;}startTraining(t);}keepAwake();update();},
  'training-next':()=>{const t=currentTraining();if(!t||t.run.status!=='live')return;confirmAction(t.run.index===3?'Training afronden':'Volgende onderdeel',t.run.index===3?'De training wordt afgerond en blijft bewaard.':'Je sluit dit onderdeel af. De timer begint opnieuw voor het volgende onderdeel.','confirm-training-next',t.run.index===3?'Afronden':'Volgende');},
  'confirm-training-next':()=>{const t=currentTraining();if(!t)return;nextBlock(t);dialog.close();keepAwake();update();},
  'share-training':()=>{const t=currentTraining();if(!t)return;modal('Trainingsschema delen',`<label class="stack">Bericht<textarea id="summary-text" rows="12">${esc(trainingText(t))}</textarea></label><div class="row"><button class="primary" data-action="copy-summary">Kopiëren</button>${navigator.share?'<button data-action="share-summary">Delen…</button>':''}</div>`);summaryTargetId='';}
 });
-document.addEventListener('change',e=>{
- if(e.target.form?.id==='training-form'&&e.target.name==='date'){const start=e.target.form.elements.start;start.value=defaultStart(e.target.value);$('#training-time-preview').textContent=`${start.value} · ${e.target.form.elements.field.value}`;}
-});
+function rememberTrainingInput({target}){
+ const form=target.form,d=trainingDraft;
+ if(form?.id!=='training-form'||!d)return;
+ const {name,value}=target;
+ if(/^link[0-3]$/.test(name)){(d.links??=['','','',''])[Number(name.slice(-1))]=value;return;}
+ if(!['date','start','field','theme'].includes(name))return;
+ d[name]=value;
+ if(name==='start')d.customStart=true;
+ if(name==='date'&&value&&!d.customStart){form.elements.start.value=defaultStart(value);d.start=form.elements.start.value;}
+ const {start,field}=form.elements;
+ $('#training-time-preview').textContent=[start.value,field.value].filter(Boolean).join(' · ');
+}
+document.addEventListener('input',rememberTrainingInput);
+document.addEventListener('change',rememberTrainingInput);
 document.addEventListener('submit',e=>{
  if(e.target.id!=='training-form')return;e.preventDefault();
  const f=e.target,d=new FormData(f);

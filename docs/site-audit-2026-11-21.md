@@ -1,0 +1,19 @@
+# Audit Zijlijn · 21 november 2026
+
+Uitgangspunt: een coach die met één telefoon de wedstrijd bedient. Bekeken: Wedstrijd, Opstelling, Training, Mijn team (inclusief historie en statistieken), lokale opslag, back-ups en de offline-update. Versie 1.8.1 bouwt voort op 1.8.0; het opslagformaat verandert niet.
+
+| Onderdeel | Bevinding | Wijziging in 1.8.1 |
+| --- | --- | --- |
+| Aftrap | De klok startte met één ingevulde positie, ook als er zes spelers beschikbaar waren. Ontbrekende spelers kregen geen minuten. | Bij een onvolledige opstelling kun je de posities aanvullen of bewust met minder spelers starten. Afwezige spelers staan vóór de aftrap bij de bank, met een link om dit aan te passen. |
+| Wedstrijd | Een lange tegenstandernaam duwde één score en zijn knoppen omlaag. | Beide kolommen delen dezelfde rijen. De thuis-uitvolgorde blijft leidend. Het wisseladvies en de herinnering gebruiken dezelfde berekening per tik. |
+| Opstelling | Een afgeronde opstelling vervaagde alsof de namen niet meer relevant waren. Lege plekken waren moeilijk te onderscheiden. | Namen blijven leesbaar; lege posities hebben een eigen markering. |
+| Training | Links gingen verloren bij tabwissels vóór opslaan; een datumwijziging kon een bewust gekozen tijd vervangen. | Het formulier bewaart je invoer tijdens het wisselen van tabblad en toont direct tijd en veld. De timer onderscheidt lopen, pauze en afronden. Een concept is nog niet opgeslagen als je de app herlaadt. |
+| Mijn team | Ook op het spelerscherm berekende de app de onzichtbare statistieken en historie. Eén tik op verwijderen was definitief. | Alleen het gekozen onderdeel wordt opgebouwd. Voor verwijderen krijg je de naam te zien en kun je annuleren. De historische selectie blijft bewaard. |
+| Navigatie en leesbaarheid | De actieve tab was vooral te herkennen aan kleur. Kleine bediening en ongelijke marges maakten de site minder makkelijk te scannen. | Een streep markeert de actieve tab, aanwezigheid heeft een tikgebied van 44 pixels en kop en inhoud lijnen uit. Wisselen naar een ander hoofdscherm brengt je bovenaan. |
+| Gegevens en offline | Bij een schrijffout kon de app toch ‘opgeslagen’ tonen. Een ander tabblad kon onopgeslagen wijzigingen verdringen. Een offline startlink met extra parameters miste de cache. | De status volgt de opslag. De app beschermt conflicterende versies en herlaadt dan niet automatisch; je kunt eerst exporteren. Extra parameters op de startlink werken na een eerdere online installatie ook offline. |
+
+**Controle.** 128 automatische tests geslaagd en alle JavaScript-bestanden door de syntaxcontrole. Bestaande scenario's dekken onder meer thuis/uit, doelpuntenmakers en correcties, dubbele wissels, gesimuleerde wedstrijden met 7/8/9 spelers, speeltijd, historie, import/export, training en updates. Nieuwe tests dekken onder andere onvolledige opstelling, korte teams, verborgen afwezigheid, concepttraining, verwijderen en opslagherstel.
+
+**Visueel.** De vier hoofdschermen in Chromium bekeken op gesimuleerde telefoonbreedtes van 320, 360 en 390 px. Op de smalste weergave een uitwedstrijd met een lange tegenstandernaam ingesteld: beide cijfers én beide rijen actieknoppen stonden op dezelfde hoogte. Geen horizontale overloop gemeten op de gecontroleerde hoofdschermen. Rinus-link ingevuld, naar Wedstrijd en terug gegaan, waarde bleef staan. Dit was geen fysieke iPhone/Safari-test; het iOS-deelmenu, echte schermvergrendeling en het openen van de externe apps zijn niet op een telefoon getest.
+
+**Aanbevolen vervolg.** Test één keer op de eigen iPhone met een aparte testwedstrijd: heropen vanaf het beginscherm zonder bereik, draai de voorbespreking naar landschap en controleer of de klok tijdens een actieve helft zichtbaar blijft. Voor nu geen extra dashboard of andere kleurstelling toevoegen. Als de trainingslijst in de loop van het seizoen lang wordt, is archiveren een zinvolle volgende stap.
